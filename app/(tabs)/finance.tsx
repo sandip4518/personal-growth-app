@@ -206,7 +206,7 @@ export default function FinanceScreen() {
                 <Text style={styles.sectionTitle}>Expense Breakdown</Text>
                 <PieChart
                   data={chartData}
-                  width={screenWidth - 80}
+                  width={screenWidth - 40}
                   height={220}
                   chartConfig={{
                     color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
@@ -214,7 +214,7 @@ export default function FinanceScreen() {
                   accessor="amount"
                   backgroundColor="transparent"
                   paddingLeft="15"
-                  center={[0, 0]}
+                  center={[10, 0]}
                   absolute={false}
                 />
               </View>
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
   },
   chartSection: {
     backgroundColor: '#FFFFFF',
-    padding: 20,
+    paddingVertical: 20,
     borderRadius: 16,
     marginBottom: 24,
     shadowColor: '#000',
@@ -390,6 +390,7 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 16,
     alignSelf: 'flex-start',
+    marginLeft: 20,
   },
   addSection: {
     backgroundColor: '#FFFFFF',
