@@ -1,98 +1,86 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
 
 export default function HomeScreen() {
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView contentContainerStyle={styles.container}>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+        <Text style={styles.header}>Good Morning Sandy 👋</Text>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Daily Motivation</Text>
+          <Text style={styles.quote}>
+            &quot;Small daily improvements are the key to long-term success.&quot;
+          </Text>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Today&apos;s Tasks</Text>
+          <Text style={styles.item}>• Review project proposal</Text>
+          <Text style={styles.item}>• Gym workout</Text>
+          <Text style={styles.item}>• Study MERN stack</Text>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Habit Progress</Text>
+          <Text style={styles.item}>Workout 🔥 6 days</Text>
+          <Text style={styles.item}>Reading 🔥 4 days</Text>
+          <Text style={styles.item}>Meditation 🔥 3 days</Text>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Finance Summary</Text>
+          <Text style={styles.item}>Income: ₹40,000</Text>
+          <Text style={styles.item}>Expenses: ₹18,000</Text>
+          <Text style={styles.item}>Savings: ₹22,000</Text>
+        </View>
+
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#F5F7FB"
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+
+  container: {
+    padding: 20
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+
+  header: {
+    fontSize: 26,
+    fontWeight: "bold",
+    marginBottom: 20,
+    paddingTop: 50
   },
+
+  card: {
+    backgroundColor: "#FFFFFF",
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 3
+  },
+
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 8
+  },
+
+  quote: {
+    fontStyle: "italic",
+    fontSize: 14
+  },
+
+  item: {
+    fontSize: 14,
+    marginBottom: 4
+  }
 });
