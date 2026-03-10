@@ -33,6 +33,8 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="auth/login" options={{ title: '✨ Personal Growth', headerStyle: { backgroundColor: '#F5F7FB' }, headerTintColor: '#6C63FF', headerTitleAlign: 'center', headerTitleStyle: { fontWeight: 'bold', fontSize: 20 }, headerShadowVisible: false }} />
+        <Stack.Screen name="auth/register" options={{ title: '✨ Personal Growth', headerStyle: { backgroundColor: '#F5F7FB' }, headerTintColor: '#6C63FF', headerTitleAlign: 'center', headerTitleStyle: { fontWeight: 'bold', fontSize: 20 }, headerShadowVisible: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style="auto" />
