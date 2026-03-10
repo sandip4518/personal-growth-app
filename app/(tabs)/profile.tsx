@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { BarChart } from 'react-native-chart-kit';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const screenWidth = Dimensions.get('window').width;
@@ -19,6 +20,7 @@ const HABITS_STORAGE_KEY = 'HABITS_STORAGE';
 const TASK_STORAGE_KEY = 'tasks_storage';
 const FINANCE_STORAGE_KEY = 'FINANCE_STORAGE';
 const GOALS_STORAGE = 'GOALS_STORAGE';
+const LIFE_BALANCE_STORAGE = 'LIFE_BALANCE_STORAGE';
 const TARGET_SAVINGS = 100000;
 
 interface Goal {
@@ -56,6 +58,11 @@ export default function ProfileScreen() {
   const [completedGoals, setCompletedGoals] = useState(0);
   const [activeGoalsCount, setActiveGoalsCount] = useState(0);
   const [activeGoalsList, setActiveGoalsList] = useState<Goal[]>([]);
+
+  // Life Balance State
+  const [lifeBalance, setLifeBalance] = useState<Record<string, number>>({
+    Health: 5, Career: 5, Finance: 5, Learning: 5, Relationships: 5, Mindset: 5, Fun: 5
+  });
 
   const [quote] = useState(QUOTES[Math.floor(Math.random() * QUOTES.length)]);
 
@@ -160,6 +167,12 @@ export default function ProfileScreen() {
         setActiveGoalsList(active.slice(0, 3)); // Show top 3 active goals
       }
 
+      // Load Life Balance
+      const storedBalance = await AsyncStorage.getItem(LIFE_BALANCE_STORAGE);
+      if (storedBalance) {
+        setLifeBalance(JSON.parse(storedBalance));
+      }
+
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
     }
@@ -174,9 +187,18 @@ export default function ProfileScreen() {
     }
   };
 
+  const updateLifeBalance = async (area: string, value: number) => {
+    const newBalance = { ...lifeBalance, [area]: value };
+    setLifeBalance(newBalance);
+    await AsyncStorage.setItem(LIFE_BALANCE_STORAGE, JSON.stringify(newBalance));
+  };
+
   // Calculations
   const productivityScore = Math.min(100, Math.round(((completedTasks + (highestStreak * 2)) / Math.max(1, (totalTasks + totalHabits))) * 100)) || 0;
   const savingsProgress = Math.min(100, (savings / TARGET_SAVINGS) * 100);
+
+  const balanceValues = Object.values(lifeBalance);
+  const averageBalance = (balanceValues.reduce((a, b) => a + b, 0) / balanceValues.length).toFixed(1);
 
   // Badges Logic
   // 1. Streak Badge Logic (Tiers: 3, 7, 14, 30, 60, 100 days)
@@ -227,19 +249,27 @@ export default function ProfileScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Profile Header */}
-        <View style={styles.headerGradient}>
-          <TouchableOpacity style={styles.logoutButtonTopRight} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={20} color="#E74C3C" />
-            <Text style={styles.logoutTextSmall}>Logout</Text>
+        <View style={styles.headerCard}>
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+            <Ionicons name="log-out-outline" size={18} color="#FF5252" />
+            <Text style={styles.logoutBtnText}>Logout</Text>
           </TouchableOpacity>
 
-          <View style={styles.avatarCard}>
-            <Text style={styles.avatarText}>
-              {userData?.name ? userData.name.charAt(0).toUpperCase() : 'U'}
-            </Text>
+          <View style={styles.headerContent}>
+            <View style={styles.avatarWrapper}>
+              <View style={styles.avatarMain}>
+                <Text style={styles.avatarInitial}>
+                  {userData?.name ? userData.name.charAt(0).toUpperCase() : 'U'}
+                </Text>
+              </View>
+              <View style={styles.onlineBadge} />
+            </View>
+
+            <View style={styles.userInfo}>
+              <Text style={styles.userName}>{userData?.name || 'User'}</Text>
+              <Text style={styles.userEmail}>{userData?.email || 'user@email.com'}</Text>
+            </View>
           </View>
-          <Text style={styles.name}>{userData?.name || 'User'}</Text>
-          <Text style={styles.email}>{userData?.email || 'user@email.com'}</Text>
         </View>
 
         <View style={styles.content}>
@@ -375,6 +405,78 @@ export default function ProfileScreen() {
             </View>
           </View>
 
+          {/* Life Balance Tracker */}
+          <View style={styles.card}>
+            <View style={styles.cardHeaderRow}>
+              <Ionicons name="pie-chart" size={20} color="#4A90E2" />
+              <Text style={styles.cardTitle}>Life Balance</Text>
+            </View>
+            <View style={styles.numberRow}>
+              <Text style={[styles.metricBig, { color: '#4A90E2' }]}>{averageBalance}</Text>
+              <Text style={styles.metricSub}>/ 10 Score</Text>
+            </View>
+
+            {/* Bar Chart Visualization */}
+            <BarChart
+              data={{
+                labels: ["Health", "Career", "Finance", "Learn", "Relat.", "Mind.", "Fun"],
+                datasets: [{ data: Object.values(lifeBalance) }]
+              }}
+              width={screenWidth - 90}
+              height={220}
+              yAxisLabel=""
+              yAxisSuffix=""
+              fromZero
+              chartConfig={{
+                backgroundColor: "#FFFFFF",
+                backgroundGradientFrom: "#FFFFFF",
+                backgroundGradientTo: "#FFFFFF",
+                decimalPlaces: 0,
+                color: (opacity = 1) => `rgba(74, 144, 226, ${opacity})`,
+                labelColor: (opacity = 1) => `rgba(136, 136, 136, ${opacity})`,
+                style: { borderRadius: 16 },
+                propsForBackgroundLines: { strokeDasharray: "" },
+                barPercentage: 0.7, // Denser bars
+              }}
+              style={{
+                marginVertical: 16,
+                borderRadius: 16,
+                paddingRight: 35, // Balanced padding
+                alignSelf: 'center', // Center it horizontally
+              }}
+              verticalLabelRotation={0}
+            />
+
+            <View style={{ marginTop: 8 }}>
+              {Object.entries(lifeBalance).map(([area, value]) => (
+                <View key={area} style={{ marginBottom: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: '#555' }} numberOfLines={1}>
+                      {area}
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <TouchableOpacity
+                        onPress={() => updateLifeBalance(area, Math.max(1, value - 1))}
+                        style={styles.balanceBtn}
+                      >
+                        <Ionicons name="remove" size={16} color="#4A90E2" />
+                      </TouchableOpacity>
+                      <Text style={{ width: 30, textAlign: 'center', fontWeight: 'bold', color: '#4A90E2', fontSize: 15 }}>
+                        {value}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => updateLifeBalance(area, Math.min(10, value + 1))}
+                        style={styles.balanceBtn}
+                      >
+                        <Ionicons name="add" size={16} color="#4A90E2" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+
           {/* Achievements Section */}
           <Text style={styles.sectionTitle}>Achievements</Text>
           <View style={styles.achievementsGrid}>
@@ -424,70 +526,93 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#F5F7FB',
   },
-  headerGradient: {
-    paddingTop: 50,
-    paddingBottom: 30,
-    paddingHorizontal: 20,
+  headerCard: {
     backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 15,
-    elevation: 5,
-    marginBottom: 20,
+    paddingTop: 60,
+    paddingBottom: 30,
+    paddingHorizontal: 24,
+    borderBottomLeftRadius: 36,
+    borderBottomRightRadius: 36,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
+    elevation: 10,
+    marginBottom: 24,
     position: 'relative',
   },
-  logoutButtonTopRight: {
+  logoutBtn: {
     position: 'absolute',
     top: 50,
     right: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFEAEA',
+    backgroundColor: '#FFF5F5',
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#FFE0E0',
+    zIndex: 10,
   },
-  logoutTextSmall: {
-    color: '#E74C3C',
-    fontWeight: '600',
-    fontSize: 12,
-    marginLeft: 4,
+  logoutBtnText: {
+    color: '#FF5252',
+    fontWeight: '700',
+    fontSize: 13,
+    marginLeft: 6,
   },
-  avatarCard: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
+  headerContent: {
+    alignItems: 'center',
+  },
+  avatarWrapper: {
+    position: 'relative',
+    marginBottom: 16,
+  },
+  avatarMain: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: '#6C63FF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
     shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 8,
-    borderWidth: 3,
-    borderColor: '#E8E6FF',
+    shadowRadius: 12,
+    elevation: 12,
+    borderWidth: 4,
+    borderColor: '#F0EFFF',
   },
-  avatarText: {
-    fontSize: 36,
-    fontWeight: 'bold',
+  avatarInitial: {
+    fontSize: 42,
+    fontWeight: '900',
     color: '#FFFFFF',
   },
-  name: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
+  onlineBadge: {
+    position: 'absolute',
+    bottom: 5,
+    right: 5,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#2ECC71',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
   },
-  email: {
+  userInfo: {
+    alignItems: 'center',
+  },
+  userName: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#1A1A1A',
+    marginBottom: 4,
+    letterSpacing: -0.5,
+  },
+  userEmail: {
     fontSize: 14,
-    color: '#888',
-    fontWeight: '500',
+    color: '#7F8C8D',
+    fontWeight: '600',
   },
   content: {
     paddingHorizontal: 20,
@@ -657,5 +782,20 @@ const styles = StyleSheet.create({
     color: '#888',
     textAlign: 'center',
     marginTop: 2,
+  },
+  balanceBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#F0F7FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#D0E4FF',
+  },
+  balanceBtnText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
   },
 });
