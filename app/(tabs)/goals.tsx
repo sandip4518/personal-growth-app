@@ -7,6 +7,7 @@ import {
     Alert,
     FlatList,
     Modal,
+    Platform,
     StyleSheet,
     Text,
     TextInput,
@@ -14,6 +15,8 @@ import {
     View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { THEME } from "../../constants/types";
+import { useGrowthData } from "../../hooks/useGrowthData";
 
 interface Subgoal {
     id: string;
@@ -42,6 +45,7 @@ const FINANCE_STORAGE_KEY = "FINANCE_STORAGE";
 export default function GoalsScreen() {
     const insets = useSafeAreaInsets();
     const [goals, setGoals] = useState<Goal[]>([]);
+    const { metrics } = useGrowthData();
     const [modalVisible, setModalVisible] = useState(false);
     const [progressModalVisible, setProgressModalVisible] = useState(false);
     const [selectedCustomGoal, setSelectedCustomGoal] = useState<Goal | null>(null);
@@ -506,27 +510,48 @@ export default function GoalsScreen() {
     };
 
     return (
-        <View style={[styles.safeArea, { paddingTop: insets.top }]}>
+        <View style={[styles.mainSafeArea, { paddingTop: insets.top }]}>
             <FlatList
                 data={goals}
                 keyExtractor={(item) => item.id}
                 renderItem={renderGoal}
                 contentContainerStyle={styles.container}
+                showsVerticalScrollIndicator={false}
                 ListHeaderComponent={
-                    <>
-                        <View style={styles.header}>
+                    <View style={styles.headerContainer}>
+                        {/* Standardized Header */}
+                        <View style={styles.dashboardHeader}>
                             <View>
-                                <Text style={styles.title}>Goals</Text>
-                                <Text style={styles.subtitle}>Track your long-term achievements</Text>
+                                <Text style={styles.greeting}>Goals 🎯</Text>
+                                <View style={styles.titleBadgeContainer}>
+                                    <Text style={styles.titleBadgeText}>{metrics?.userTitle || "Growth Seeker"}</Text>
+                                </View>
                             </View>
-                            <TouchableOpacity
-                                style={styles.addButtonCircle}
-                                onPress={openCreateModal}
-                            >
-                                <Ionicons name="add" size={28} color="#FFFFFF" />
-                            </TouchableOpacity>
+                            <View style={styles.lvlBadge}>
+                                <Text style={styles.lvlText}>LVL {metrics?.level || 1}</Text>
+                            </View>
                         </View>
-                    </>
+
+                        {/* Level Progress Bar */}
+                        <View style={styles.levelProgressContainer}>
+                            <View style={styles.levelInfoRow}>
+                                <Text style={styles.levelTitle}>{metrics?.levelTitle || "Growth Seeker"}</Text>
+                                <Text style={styles.xpText}>{metrics?.xp || 0} XP</Text>
+                            </View>
+                            <View style={styles.levelBarBg}>
+                                <View style={[styles.levelBarFill, { width: `${(metrics?.xp || 0) % 100}%` }]} />
+                            </View>
+                        </View>
+
+                        <TouchableOpacity
+                            style={styles.floatingAddBtn}
+                            onPress={openCreateModal}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="add" size={24} color="#FFF" />
+                            <Text style={styles.floatingAddText}>Set New Goal</Text>
+                        </TouchableOpacity>
+                    </View>
                 }
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
@@ -698,81 +723,117 @@ export default function GoalsScreen() {
 }
 
 const styles = StyleSheet.create({
-    safeArea: {
+    mainSafeArea: {
         flex: 1,
-        backgroundColor: "#F5F7FB",
+        backgroundColor: THEME.colors.background,
     },
     container: {
         paddingHorizontal: 20,
         paddingTop: 16,
         paddingBottom: 40,
     },
-    header: {
+    headerContainer: {
+        marginBottom: 8,
+    },
+    dashboardHeader: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        marginBottom: 24,
+        marginBottom: 20,
     },
-    title: {
-        fontSize: 32,
-        fontWeight: "800",
-        color: "#1A1A1A",
+    greeting: { fontSize: 24, fontWeight: "800", color: THEME.colors.text },
+    lvlBadge: {
+        backgroundColor: THEME.colors.primary,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
     },
-    subtitle: {
-        fontSize: 16,
-        color: "#666666",
+    lvlText: { color: "#FFF", fontWeight: "bold", fontSize: 12 },
+    levelProgressContainer: { marginBottom: 24 },
+    levelInfoRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        marginBottom: 8,
+    },
+    levelTitle: { fontSize: 16, fontWeight: "700", color: THEME.colors.text },
+    xpText: { fontSize: 14, color: THEME.colors.primary, fontWeight: "600" },
+    levelBarBg: {
+        height: 6,
+        backgroundColor: "#E5E7EB",
+        borderRadius: 3,
+        overflow: "hidden",
+    },
+    levelBarFill: { height: "100%", backgroundColor: THEME.colors.primary },
+    titleBadgeContainer: {
+        backgroundColor: THEME.colors.primary,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 20,
         marginTop: 4,
+        alignSelf: "flex-start",
     },
-    addButtonCircle: {
-        width: 50,
-        height: 50,
-        backgroundColor: "#6C63FF",
-        borderRadius: 25,
-        justifyContent: "center",
+    titleBadgeText: {
+        color: "#FFF",
+        fontSize: 10,
+        fontWeight: "800",
+        textTransform: "uppercase",
+    },
+    floatingAddBtn: {
+        backgroundColor: THEME.colors.primary,
+        flexDirection: "row",
         alignItems: "center",
-        shadowColor: "#6C63FF",
-        shadowOffset: { width: 0, height: 4 },
+        justifyContent: "center",
+        paddingVertical: 14,
+        paddingHorizontal: 20,
+        borderRadius: 16,
+        marginBottom: 24,
+        shadowColor: THEME.colors.primary,
         shadowOpacity: 0.3,
-        shadowRadius: 8,
+        shadowRadius: 10,
         elevation: 4,
     },
+    floatingAddText: {
+        color: "#FFF",
+        fontWeight: "800",
+        fontSize: 16,
+        marginLeft: 8,
+    },
     goalCard: {
-        backgroundColor: "#FFFFFF",
-        padding: 18,
-        borderRadius: 20,
+        backgroundColor: THEME.colors.white,
+        padding: 24,
+        borderRadius: 28,
         marginBottom: 16,
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
-        shadowRadius: 8,
-        elevation: 2,
+        shadowOpacity: 0.05,
+        shadowRadius: 20,
+        elevation: 5,
     },
     goalHeader: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "flex-start",
-        marginBottom: 8,
+        marginBottom: 12,
     },
     titleRow: {
         flex: 1,
     },
     goalTitle: {
-        fontSize: 18,
-        fontWeight: "bold",
-        color: "#1A1A1A",
-        marginBottom: 4,
+        fontSize: 20,
+        fontWeight: "900",
+        color: THEME.colors.text,
+        marginBottom: 6,
     },
     typeBadge: {
         backgroundColor: "#E8E6FF",
         alignSelf: "flex-start",
         paddingHorizontal: 10,
         paddingVertical: 4,
-        borderRadius: 8,
+        borderRadius: 10,
     },
     typeBadgeText: {
-        color: "#6C63FF",
-        fontSize: 12,
-        fontWeight: "600",
+        color: THEME.colors.primary,
+        fontSize: 11,
+        fontWeight: "800",
         textTransform: "uppercase",
     },
     actionRow: {
@@ -780,58 +841,60 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     actionIcon: {
-        marginLeft: 12,
+        marginLeft: 16,
     },
     goalDesc: {
-        fontSize: 14,
-        color: "#666",
-        marginBottom: 12,
+        fontSize: 15,
+        color: THEME.colors.textLight,
+        marginBottom: 16,
+        lineHeight: 22,
     },
     progressContainer: {
-        marginVertical: 12,
+        marginVertical: 16,
     },
     barTextMode: {
-        fontFamily: "monospace",
-        fontSize: 14,
-        color: "#6C63FF",
-        marginBottom: 6,
+        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+        fontSize: 13,
+        color: THEME.colors.primary,
+        marginBottom: 8,
         letterSpacing: 2,
+        fontWeight: '700',
     },
     progressBarBg: {
-        height: 8,
-        backgroundColor: "#F0F0F0",
-        borderRadius: 4,
+        height: 10,
+        backgroundColor: "#F3F4F6",
+        borderRadius: 5,
         overflow: "hidden",
-        marginBottom: 6,
+        marginBottom: 10,
     },
     progressBarFill: {
         height: "100%",
-        borderRadius: 4,
+        borderRadius: 5,
     },
     motivationalText: {
-        fontSize: 13,
-        color: "#6C63FF",
-        fontWeight: "600",
+        fontSize: 14,
+        color: THEME.colors.primary,
+        fontWeight: "700",
         fontStyle: "italic",
     },
     planningBreakdown: {
-        backgroundColor: "#F9F9FF",
-        padding: 12,
-        borderRadius: 12,
+        backgroundColor: "#F9FAFC",
+        padding: 16,
+        borderRadius: 20,
         marginTop: 12,
         borderWidth: 1,
-        borderColor: "#E8E6FF",
+        borderColor: "#EEEEEE",
     },
     planningTitle: {
         fontSize: 12,
-        fontWeight: "700",
-        color: "#6C63FF",
+        fontWeight: "900",
+        color: THEME.colors.primary,
         textTransform: "uppercase",
-        letterSpacing: 0.5,
-        marginBottom: 8,
+        letterSpacing: 1,
+        marginBottom: 12,
     },
     planningContent: {
-        gap: 4,
+        gap: 8,
     },
     planningRow: {
         flexDirection: "row",
@@ -839,84 +902,88 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     planningLabel: {
-        fontSize: 13,
-        color: "#666",
+        fontSize: 14,
+        color: THEME.colors.textLight,
+        fontWeight: '600',
     },
     planningValue: {
-        fontSize: 14,
-        fontWeight: "700",
-        color: "#1A1A1A",
+        fontSize: 15,
+        fontWeight: "800",
+        color: THEME.colors.text,
     },
     planningHint: {
         fontSize: 12,
-        color: "#AAA",
+        color: "#BBB",
         fontStyle: "italic",
     },
     goalFooter: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        marginTop: 8,
-        paddingTop: 12,
+        marginTop: 12,
+        paddingTop: 16,
         borderTopWidth: 1,
-        borderTopColor: "#F5F7FB",
+        borderTopColor: "#F3F4F6",
     },
     progressText: {
-        fontSize: 14,
-        fontWeight: "700",
-        color: "#333",
+        fontSize: 16,
+        fontWeight: "900",
+        color: THEME.colors.text,
     },
     deadlineText: {
         fontSize: 13,
-        color: "#888",
-        fontWeight: "500",
+        color: THEME.colors.textLight,
+        fontWeight: "700",
     },
     emptyContainer: {
         justifyContent: "center",
         alignItems: "center",
-        marginTop: 60,
+        paddingVertical: 80,
     },
     emptyText: {
-        marginTop: 12,
+        marginTop: 16,
         fontSize: 16,
-        color: "#A0A0A0",
+        color: THEME.colors.textLight,
+        fontWeight: "600",
         textAlign: "center",
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: "rgba(0,0,0,0.5)",
-        justifyContent: "center",
-        padding: 20,
+        backgroundColor: "rgba(0,0,0,0.6)",
+        justifyContent: "flex-end",
     },
     modalContent: {
         backgroundColor: "#FFFFFF",
-        borderRadius: 24,
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
         padding: 24,
+        paddingBottom: Platform.OS === 'ios' ? 40 : 24,
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.1,
+        shadowOpacity: 0.15,
         shadowRadius: 20,
-        elevation: 10,
+        elevation: 20,
     },
     modalTitle: {
-        fontSize: 22,
-        fontWeight: "bold",
-        color: "#1A1A1A",
+        fontSize: 24,
+        fontWeight: "900",
+        color: THEME.colors.text,
         marginBottom: 8,
     },
     modalSub: {
         fontSize: 16,
-        color: "#666",
-        marginBottom: 20,
+        color: THEME.colors.textLight,
+        marginBottom: 24,
     },
     input: {
-        backgroundColor: "#F5F7FB",
-        height: 54,
-        borderRadius: 12,
+        backgroundColor: "#F9FAFC",
+        height: 56,
+        borderRadius: 16,
         paddingHorizontal: 16,
         fontSize: 16,
-        color: "#333",
+        color: THEME.colors.text,
         marginBottom: 16,
+        borderWidth: 1,
+        borderColor: "#EEEEEE",
     },
     inputHint: {
         fontSize: 12,
@@ -926,10 +993,12 @@ const styles = StyleSheet.create({
         marginTop: -10,
     },
     pickerContainer: {
-        backgroundColor: "#F5F7FB",
-        borderRadius: 12,
+        backgroundColor: "#F9FAFC",
+        borderRadius: 16,
         marginBottom: 16,
         overflow: "hidden",
+        borderWidth: 1,
+        borderColor: "#EEEEEE",
     },
     picker: {
         height: 54,
@@ -939,40 +1008,41 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        backgroundColor: "#F5F7FB",
+        backgroundColor: "#F9FAFC",
         paddingHorizontal: 16,
         paddingVertical: 14,
-        borderRadius: 12,
+        borderRadius: 16,
         marginBottom: 16,
+        borderWidth: 1,
+        borderColor: "#EEEEEE",
     },
     subgoalToggleLabel: {
         fontSize: 16,
-        color: "#333",
-        fontWeight: "500",
+        color: THEME.colors.text,
+        fontWeight: "700",
     },
     toggleSwitch: {
-        width: 44,
-        height: 24,
-        backgroundColor: "#D3D3D3",
-        borderRadius: 12,
+        width: 48,
+        height: 26,
+        backgroundColor: "#D1D5DB",
+        borderRadius: 13,
         padding: 2,
     },
     toggleSwitchActive: {
-        backgroundColor: "#6C63FF",
+        backgroundColor: THEME.colors.primary,
     },
     toggleKnob: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
+        width: 22,
+        height: 22,
+        borderRadius: 11,
         backgroundColor: "#FFF",
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 2,
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
         elevation: 2,
     },
     toggleKnobActive: {
-        transform: [{ translateX: 20 }],
+        transform: [{ translateX: 22 }],
     },
     subgoalsFormContainer: {
         marginBottom: 16,
@@ -988,50 +1058,56 @@ const styles = StyleSheet.create({
         borderBottomRightRadius: 0,
     },
     addSubgoalBtn: {
-        backgroundColor: "#6C63FF",
-        height: 54,
-        paddingHorizontal: 16,
+        backgroundColor: THEME.colors.primary,
+        height: 56,
+        paddingHorizontal: 18,
         justifyContent: "center",
         alignItems: "center",
-        borderTopRightRadius: 12,
-        borderBottomRightRadius: 12,
+        borderTopRightRadius: 16,
+        borderBottomRightRadius: 16,
     },
     subgoalsListForm: {
         marginTop: 12,
-        backgroundColor: "#F5F7FB",
-        borderRadius: 12,
+        backgroundColor: "#F9FAFC",
+        borderRadius: 16,
         padding: 12,
+        borderWidth: 1,
+        borderColor: "#EEEEEE",
     },
     subgoalItemForm: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        paddingVertical: 8,
+        paddingVertical: 10,
         borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: "#E0E0E0",
+        borderBottomColor: "#E5E7EB",
     },
     subgoalItemTextForm: {
         fontSize: 14,
-        color: "#333",
+        color: THEME.colors.text,
         flex: 1,
+        fontWeight: '600',
     },
     subgoalsCardContainer: {
         marginTop: 4,
-        marginBottom: 12,
-        backgroundColor: "#F8F9FA",
-        borderRadius: 12,
-        padding: 12,
+        marginBottom: 16,
+        backgroundColor: "#F9FAFC",
+        borderRadius: 20,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: "#EEEEEE",
     },
     subgoalRowCard: {
         flexDirection: "row",
         alignItems: "center",
-        paddingVertical: 6,
+        paddingVertical: 8,
     },
     subgoalTitleCard: {
-        fontSize: 15,
-        color: "#333",
+        fontSize: 16,
+        color: THEME.colors.text,
         marginLeft: 12,
         flex: 1,
+        fontWeight: '600',
     },
     subgoalCompletedCard: {
         color: "#A0A0A0",
@@ -1044,27 +1120,28 @@ const styles = StyleSheet.create({
     },
     modalBtn: {
         flex: 1,
-        height: 54,
-        borderRadius: 12,
+        height: 56,
+        borderRadius: 16,
         justifyContent: "center",
         alignItems: "center",
     },
     cancelBtn: {
-        backgroundColor: "#F5F7FB",
+        backgroundColor: "#F3F4F6",
         marginRight: 8,
     },
     cancelBtnText: {
-        color: "#666",
+        color: THEME.colors.textLight,
         fontSize: 16,
-        fontWeight: "600",
+        fontWeight: "800",
     },
     submitBtn: {
-        backgroundColor: "#6C63FF",
+        backgroundColor: THEME.colors.primary,
         marginLeft: 8,
     },
     submitBtnText: {
         color: "#FFFFFF",
         fontSize: 16,
-        fontWeight: "600",
+        fontWeight: "900",
     },
 });
+

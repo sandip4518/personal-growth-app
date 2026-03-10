@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { STORAGE_KEYS, Task, THEME } from "../../constants/types";
+import { useGrowthData } from "../../hooks/useGrowthData";
 
 export default function TasksScreen() {
   const insets = useSafeAreaInsets();
@@ -21,6 +22,7 @@ export default function TasksScreen() {
   const [newTaskPriority, setNewTaskPriority] = useState<"high" | "medium" | "low">("medium");
   const flatListRef = useRef<FlatList>(null);
   const [isReady, setIsReady] = useState(false);
+  const { metrics, data: growthData } = useGrowthData();
 
   // Focus Timer State
   const FOCUS_DURATION = 25 * 60;
@@ -208,10 +210,28 @@ export default function TasksScreen() {
   return (
     <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       <View style={styles.container}>
-        {/* Header Section */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Tasks</Text>
-          <Text style={styles.subtitle}>Manage your daily tasks</Text>
+        {/* Standardized Tasks Header */}
+        <View style={styles.dashboardHeader}>
+          <View>
+            <Text style={styles.greeting}>Tasks 📝</Text>
+            <View style={styles.titleBadgeContainer}>
+              <Text style={styles.titleBadgeText}>{metrics?.userTitle || "Growth Seeker"}</Text>
+            </View>
+          </View>
+          <View style={styles.lvlBadge}>
+            <Text style={styles.lvlText}>LVL {metrics?.level || 1}</Text>
+          </View>
+        </View>
+
+        {/* Level Progress Bar */}
+        <View style={styles.levelProgressContainer}>
+          <View style={styles.levelInfoRow}>
+            <Text style={styles.levelTitle}>{metrics?.levelTitle || "Growth Seeker"}</Text>
+            <Text style={styles.xpText}>{metrics?.xp || 0} XP</Text>
+          </View>
+          <View style={styles.levelBarBg}>
+            <View style={[styles.levelBarFill, { width: `${(metrics?.xp || 0) % 100}%` }]} />
+          </View>
         </View>
 
         {/* Input Section */}
@@ -307,49 +327,72 @@ export default function TasksScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: THEME.colors.background,
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-  },
-  header: {
+  safeArea: { flex: 1, backgroundColor: THEME.colors.background },
+
+  container: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
+  dashboardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 20,
   },
-  title: {
-    fontSize: 32,
-    fontWeight: "800",
-    color: THEME.colors.text,
+  greeting: { fontSize: 24, fontWeight: "800", color: THEME.colors.text },
+  lvlBadge: {
+    backgroundColor: THEME.colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
-  subtitle: {
-    fontSize: 16,
-    color: THEME.colors.textLight,
+  lvlText: { color: "#FFF", fontWeight: "bold", fontSize: 12 },
+  levelProgressContainer: { marginBottom: 24 },
+  levelInfoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  levelTitle: { fontSize: 16, fontWeight: "700", color: THEME.colors.text },
+  xpText: { fontSize: 14, color: THEME.colors.primary, fontWeight: "600" },
+  levelBarBg: {
+    height: 6,
+    backgroundColor: "#E5E7EB",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  levelBarFill: { height: "100%", backgroundColor: THEME.colors.primary },
+  titleBadgeContainer: {
+    backgroundColor: THEME.colors.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
     marginTop: 4,
+    alignSelf: "flex-start",
+  },
+  titleBadgeText: {
+    color: "#FFF",
+    fontSize: 10,
+    fontWeight: "800",
+    textTransform: "uppercase",
   },
   inputCard: {
     backgroundColor: THEME.colors.white,
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: 28,
+    padding: 20,
     marginBottom: 24,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowRadius: 20,
+    elevation: 5,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 16,
   },
   input: {
     flex: 1,
     backgroundColor: "#F9FAFC",
     height: 50,
-    borderRadius: 12,
+    borderRadius: 16,
     paddingHorizontal: 16,
     fontSize: 16,
     color: THEME.colors.text,
@@ -361,11 +404,10 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     backgroundColor: THEME.colors.primary,
-    borderRadius: 12,
+    borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
     shadowColor: THEME.colors.primary,
-    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
@@ -377,126 +419,74 @@ const styles = StyleSheet.create({
   },
   selectorLabel: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "700",
     color: THEME.colors.textLight,
     marginRight: 10,
   },
   priorityOption: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "transparent",
-    backgroundColor: "#F5F7FB",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: "#F3F4F6",
   },
-  priorityOptionSelected: {
-    backgroundColor: "#FFFFFF",
-  },
+  priorityOptionSelected: { backgroundColor: "#FFF", borderWidth: 2 },
   priorityOptionText: {
     fontSize: 12,
     color: THEME.colors.textLight,
+    fontWeight: "600",
   },
   focusContainer: {
-    backgroundColor: THEME.colors.white,
-    borderRadius: 16,
-    padding: 20,
+    backgroundColor: "#1F2937",
+    borderRadius: 28,
+    padding: 24,
     marginBottom: 24,
     alignItems: "center",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 5,
   },
-  focusTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: THEME.colors.text,
-    marginBottom: 12,
-  },
+  focusTitle: { fontSize: 18, fontWeight: "800", color: "#FFF", marginBottom: 12 },
   focusTimer: {
-    fontSize: 48,
-    fontWeight: "800",
+    fontSize: 56,
+    fontWeight: "900",
     color: THEME.colors.primary,
-    marginBottom: 20,
+    marginBottom: 24,
     fontVariant: ["tabular-nums"],
   },
-  focusButtons: {
-    flexDirection: "row",
-    gap: 16,
-    marginBottom: 16,
-  },
+  focusButtons: { flexDirection: "row", gap: 16, marginBottom: 20 },
   focusButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    minWidth: 100,
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 16,
+    minWidth: 120,
     alignItems: "center",
   },
-  focusButtonStart: {
-    backgroundColor: THEME.colors.primary,
-  },
-  focusButtonPause: {
-    backgroundColor: "#FF9F43",
-  },
-  focusButtonReset: {
-    backgroundColor: "#F5F7FB",
-  },
-  focusButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#FFFFFF",
-  },
-  focusSessionsText: {
-    fontSize: 14,
-    color: THEME.colors.textLight,
-    fontWeight: "500",
-  },
-  listContainer: {
-    paddingBottom: 24,
-    flexGrow: 1,
-  },
+  focusButtonStart: { backgroundColor: THEME.colors.primary },
+  focusButtonPause: { backgroundColor: "#FF9F43" },
+  focusButtonReset: { backgroundColor: "#374151" },
+  focusButtonText: { fontSize: 16, fontWeight: "800", color: "#FFF" },
+  focusSessionsText: { fontSize: 14, color: "#9CA3AF", fontWeight: "600" },
+  listContainer: { paddingBottom: 40 },
   taskCard: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: THEME.colors.white,
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 12,
+    padding: 20,
+    borderRadius: 28,
+    marginBottom: 16,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
   },
-  taskStatusContainer: {
-    marginRight: 12,
-  },
-  taskTitle: {
-    fontSize: 16,
-    color: THEME.colors.text,
-    fontWeight: "600",
-  },
-  taskTitleCompleted: {
-    color: "#A0A0A0",
-    textDecorationLine: "line-through",
-  },
-  taskFooter: {
-    marginTop: 6,
-    flexDirection: "row",
-  },
-  priorityBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  priorityText: {
-    fontSize: 10,
-    fontWeight: "800",
-  },
-  deleteButtonContainer: {
-    paddingLeft: 12,
-  },
+  taskStatusContainer: { marginRight: 16 },
+  taskTitle: { fontSize: 17, color: THEME.colors.text, fontWeight: "700" },
+  taskTitleCompleted: { color: "#A0A0A0", textDecorationLine: "line-through" },
+  taskFooter: { marginTop: 8, flexDirection: "row" },
+  priorityBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  priorityText: { fontSize: 11, fontWeight: "900" },
+  deleteButtonContainer: { paddingLeft: 16 },
   emptyContainer: {
     justifyContent: "center",
     alignItems: "center",
@@ -507,5 +497,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#A0A0A0",
     textAlign: "center",
+    fontWeight: "600",
   },
 });

@@ -15,6 +15,7 @@ import {
 import { PieChart } from "react-native-chart-kit";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { STORAGE_KEYS, THEME, Transaction } from "../../constants/types";
+import { useGrowthData } from "../../hooks/useGrowthData";
 
 const screenWidth = Dimensions.get("window").width;
 const EXPENSE_CATEGORIES = ["Food", "Transport", "Bills", "Shopping", "Other"];
@@ -26,6 +27,7 @@ export default function FinanceScreen() {
   const [amount, setAmount] = useState("");
   const [type, setType] = useState<"income" | "expense">("expense");
   const [category, setCategory] = useState(EXPENSE_CATEGORIES[0]);
+  const { metrics } = useGrowthData();
 
   useEffect(() => {
     loadTransactions();
@@ -76,7 +78,7 @@ export default function FinanceScreen() {
   }, [transactions]);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.mainSafeArea, { paddingTop: insets.top }]}>
       <FlatList
         data={transactions}
         keyExtractor={t => t.id}
@@ -96,7 +98,29 @@ export default function FinanceScreen() {
         )}
         ListHeaderComponent={
           <>
-            <Text style={styles.title}>Finance</Text>
+            {/* Standardized Header */}
+            <View style={styles.dashboardHeader}>
+              <View>
+                <Text style={styles.greeting}>Finance 💰</Text>
+                <View style={styles.titleBadgeContainer}>
+                  <Text style={styles.titleBadgeText}>{metrics?.userTitle || "Growth Seeker"}</Text>
+                </View>
+              </View>
+              <View style={styles.lvlBadge}>
+                <Text style={styles.lvlText}>LVL {metrics?.level || 1}</Text>
+              </View>
+            </View>
+
+            {/* Level Progress Bar */}
+            <View style={styles.levelProgressContainer}>
+              <View style={styles.levelInfoRow}>
+                <Text style={styles.levelTitle}>{metrics?.levelTitle || "Growth Seeker"}</Text>
+                <Text style={styles.xpText}>{metrics?.xp || 0} XP</Text>
+              </View>
+              <View style={styles.levelBarBg}>
+                <View style={[styles.levelBarFill, { width: `${(metrics?.xp || 0) % 100}%` }]} />
+              </View>
+            </View>
 
             <View style={styles.summaryRow}>
               <SummaryItem label="Income" value={totals.income} color="#16A34A" />
@@ -109,18 +133,20 @@ export default function FinanceScreen() {
                 <Text style={styles.cardTitle}>Expense Breakdown</Text>
                 <PieChart
                   data={chartData}
-                  width={screenWidth - 72}
-                  height={180}
-                  chartConfig={{ color: (o = 1) => `rgba(0,0,0,${o})` }}
+                  width={screenWidth - 80}
+                  height={200}
+                  chartConfig={{ color: (o = 1) => `rgba(108, 99, 255, ${o})` }}
                   accessor="amount"
                   backgroundColor="transparent"
                   paddingLeft="15"
                   center={[10, 0]}
+                  absolute
                 />
               </View>
             )}
 
             <View style={styles.addCard}>
+              <Text style={styles.cardTitle}>Add Transaction</Text>
               <View style={styles.typeToggle}>
                 <TouchableOpacity onPress={() => { setType("expense"); setCategory(EXPENSE_CATEGORIES[0]); }} style={[styles.toggleBtn, type === "expense" && styles.toggleActiveExp]}>
                   <Text style={[styles.toggleText, type === "expense" && styles.textWhite]}>Expense</Text>
@@ -129,13 +155,13 @@ export default function FinanceScreen() {
                   <Text style={[styles.toggleText, type === "income" && styles.textWhite]}>Income</Text>
                 </TouchableOpacity>
               </View>
-              <TextInput style={styles.input} placeholder="Amount" keyboardType="numeric" value={amount} onChangeText={setAmount} />
+              <TextInput style={styles.input} placeholder="Amount" keyboardType="numeric" placeholderTextColor="#A0A0A0" value={amount} onChangeText={setAmount} />
               <View style={styles.pickerWrap}>
                 <Picker selectedValue={category} onValueChange={setCategory} style={styles.picker}>
                   {(type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map(c => <Picker.Item key={c} label={c} value={c} />)}
                 </Picker>
               </View>
-              <TouchableOpacity style={styles.addBtn} onPress={handleAddTransaction}>
+              <TouchableOpacity style={styles.addBtn} onPress={handleAddTransaction} activeOpacity={0.8}>
                 <Text style={styles.addBtnText}>Add Transaction</Text>
               </TouchableOpacity>
             </View>
@@ -143,7 +169,7 @@ export default function FinanceScreen() {
             <Text style={styles.sectionTitle}>Recent Transactions</Text>
           </>
         }
-        contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40, paddingTop: 16 }}
         showsVerticalScrollIndicator={false}
       />
     </View>
@@ -160,30 +186,165 @@ function SummaryItem({ label, value, color }: { label: string; value: number; co
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: THEME.colors.background },
-  title: { fontSize: 32, fontWeight: "800", color: THEME.colors.text, marginBottom: 20 },
-  summaryRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 24 },
-  summaryItem: { backgroundColor: "#FFF", width: "31%", padding: 12, borderRadius: 16, alignItems: "center", shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 10, elevation: 2 },
-  summaryLabel: { fontSize: 11, fontWeight: "700", color: THEME.colors.textLight, textTransform: "uppercase", marginBottom: 4 },
-  summaryVal: { fontSize: 14, fontWeight: "900" },
-  chartCard: { backgroundColor: "#FFF", borderRadius: 24, padding: 16, marginBottom: 24, alignItems: "center" },
-  cardTitle: { fontSize: 16, fontWeight: "700", color: THEME.colors.text, alignSelf: "flex-start", marginLeft: 8, marginBottom: 8 },
-  addCard: { backgroundColor: "#FFF", borderRadius: 24, padding: 20, marginBottom: 24 },
-  typeToggle: { flexDirection: "row", backgroundColor: "#F3F4F6", borderRadius: 12, padding: 4, marginBottom: 16 },
-  toggleBtn: { flex: 1, paddingVertical: 10, alignItems: "center", borderRadius: 8 },
+  mainSafeArea: { flex: 1, backgroundColor: THEME.colors.background },
+  dashboardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  greeting: { fontSize: 24, fontWeight: "800", color: THEME.colors.text },
+  lvlBadge: {
+    backgroundColor: THEME.colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  lvlText: { color: "#FFF", fontWeight: "bold", fontSize: 12 },
+  levelProgressContainer: { marginBottom: 24 },
+  levelInfoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  levelTitle: { fontSize: 16, fontWeight: "700", color: THEME.colors.text },
+  xpText: { fontSize: 14, color: THEME.colors.primary, fontWeight: "600" },
+  levelBarBg: {
+    height: 6,
+    backgroundColor: "#E5E7EB",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  levelBarFill: { height: "100%", backgroundColor: THEME.colors.primary },
+  titleBadgeContainer: {
+    backgroundColor: THEME.colors.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginTop: 4,
+    alignSelf: "flex-start",
+  },
+  titleBadgeText: {
+    color: "#FFF",
+    fontSize: 10,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 24,
+  },
+  summaryItem: {
+    backgroundColor: THEME.colors.white,
+    width: "31%",
+    padding: 16,
+    borderRadius: 24,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  summaryLabel: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: THEME.colors.textLight,
+    textTransform: "uppercase",
+    marginBottom: 6,
+  },
+  summaryVal: { fontSize: 15, fontWeight: "900" },
+  chartCard: {
+    backgroundColor: THEME.colors.white,
+    borderRadius: 28,
+    padding: 20,
+    marginBottom: 24,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
+    elevation: 5,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: THEME.colors.text,
+    marginBottom: 16,
+  },
+  addCard: {
+    backgroundColor: THEME.colors.white,
+    borderRadius: 28,
+    padding: 20,
+    marginBottom: 24,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
+    elevation: 5,
+  },
+  typeToggle: {
+    flexDirection: "row",
+    backgroundColor: "#F3F4F6",
+    borderRadius: 16,
+    padding: 4,
+    marginBottom: 20,
+  },
+  toggleBtn: { flex: 1, paddingVertical: 12, alignItems: "center", borderRadius: 12 },
   toggleActiveExp: { backgroundColor: "#EF4444" },
   toggleActiveInc: { backgroundColor: "#16A34A" },
-  toggleText: { fontWeight: "700", color: THEME.colors.textLight },
+  toggleText: { fontWeight: "800", color: THEME.colors.textLight, fontSize: 13 },
   textWhite: { color: "#FFF" },
-  input: { backgroundColor: "#F9FAFB", borderRadius: 12, padding: 14, fontSize: 16, marginBottom: 12, borderWidth: 1, borderColor: "#F3F4F6" },
-  pickerWrap: { backgroundColor: "#F9FAFB", borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: "#F3F4F6", overflow: "hidden" },
+  input: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 16,
+    padding: 16,
+    fontSize: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#EEEEEE",
+    color: THEME.colors.text,
+  },
+  pickerWrap: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#EEEEEE",
+    overflow: "hidden",
+  },
   picker: { height: 50 },
-  addBtn: { backgroundColor: THEME.colors.primary, borderRadius: 12, padding: 16, alignItems: "center" },
-  addBtnText: { color: "#FFF", fontWeight: "700", fontSize: 16 },
-  sectionTitle: { fontSize: 18, fontWeight: "700", color: THEME.colors.text, marginBottom: 16 },
-  txCard: { backgroundColor: "#FFF", borderRadius: 16, padding: 12, flexDirection: "row", alignItems: "center", marginBottom: 10 },
-  txIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: "center", alignItems: "center" },
-  txTitle: { fontSize: 15, fontWeight: "700", color: THEME.colors.text },
-  txDate: { fontSize: 12, color: THEME.colors.textLight },
-  txAmount: { fontSize: 16, fontWeight: "800" },
+  addBtn: {
+    backgroundColor: THEME.colors.primary,
+    borderRadius: 16,
+    padding: 18,
+    alignItems: "center",
+    shadowColor: THEME.colors.primary,
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  addBtnText: { color: "#FFF", fontWeight: "800", fontSize: 16 },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: THEME.colors.text,
+    marginBottom: 16,
+    marginLeft: 4,
+  },
+  txCard: {
+    backgroundColor: THEME.colors.white,
+    borderRadius: 24,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  txIcon: { width: 44, height: 44, borderRadius: 14, justifyContent: "center", alignItems: "center" },
+  txTitle: { fontSize: 16, fontWeight: "700", color: THEME.colors.text },
+  txDate: { fontSize: 12, color: THEME.colors.textLight, marginTop: 2 },
+  txAmount: { fontSize: 17, fontWeight: "900" },
 });
+

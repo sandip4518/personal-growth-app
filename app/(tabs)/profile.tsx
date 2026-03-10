@@ -21,7 +21,7 @@ const screenWidth = Dimensions.get("window").width;
 export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { loading, data, metrics, refresh } = useGrowthData();
+  const { loading, data, metrics, refresh, updateTitle } = useGrowthData();
 
   const [lifeBalance, setLifeBalance] = useState<Record<string, number>>({
     Health: 5, Career: 5, Finance: 5, Learning: 5, Relationships: 5, Mindset: 5, Fun: 5
@@ -63,51 +63,62 @@ export default function ProfileScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Profile Header */}
-        <View style={styles.headerCard}>
-          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={18} color="#FF5252" />
-            <Text style={styles.logoutBtnText}>Logout</Text>
-          </TouchableOpacity>
-
-          <View style={styles.headerContent}>
-            <View style={styles.avatarWrapper}>
-              <View style={styles.avatarMain}>
-                <Text style={styles.avatarInitial}>{data.userName.charAt(0)}</Text>
-              </View>
-              <View style={styles.onlineBadge} />
-            </View>
-            <View style={styles.userInfo}>
-              <Text style={styles.userName}>{data.userName}</Text>
-              <Text style={styles.levelBadgeText}>{metrics?.levelTitle || "Growth Seeker"} • LVL {metrics?.level || 1}</Text>
+        {/* Standardized Profile Header */}
+        <View style={styles.dashboardHeader}>
+          <View>
+            <Text style={styles.greeting}>Hey, {data.userName} 👋</Text>
+            <View style={styles.titleBadgeContainer}>
+              <Text style={styles.titleBadgeText}>{metrics?.userTitle || "Growth Seeker"}</Text>
             </View>
           </View>
+          <TouchableOpacity style={styles.levelBadgeHeader} onPress={handleLogout}>
+            <Ionicons name="log-out-outline" size={18} color="#FFF" />
+          </TouchableOpacity>
         </View>
 
-        {/* Level Stats */}
-        <View style={styles.levelCard}>
+        {/* Visual Level Progress Bar */}
+        <View style={styles.levelProgressContainer}>
           <View style={styles.levelInfoRow}>
-            <Text style={styles.levelLabel}>Progress to Level {(metrics?.level || 1) + 1}</Text>
-            <Text style={styles.xpValue}>{metrics?.xp || 0} XP</Text>
+            <Text style={styles.levelTitle}>{metrics?.levelTitle || "Growth Seeker"}</Text>
+            <Text style={styles.xpText}>{metrics?.xp || 0} XP</Text>
           </View>
           <View style={styles.levelBarBg}>
             <View style={[styles.levelBarFill, { width: `${(metrics?.xp || 0) % 100}%` }]} />
           </View>
         </View>
 
-        {/* Global Stats Grid */}
+        {/* Title Shop / Selection */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Available Titles</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.titlesScroll}>
+            {data.rewardData.unlockedTitles.concat(metrics?.level && metrics.level >= 5 ? ["Growth Pioneer"] : []).map(title => (
+              <TouchableOpacity
+                key={title}
+                style={[styles.titleChoice, metrics?.userTitle === title && styles.titleChoiceActive]}
+                onPress={() => updateTitle(title)}
+              >
+                <Text style={[styles.titleChoiceText, metrics?.userTitle === title && styles.textWhite]}>{title}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Stats Grid - Standardized to Dashboard Style */}
         <View style={styles.statsGrid}>
-          <View style={styles.statItem}>
-            <Text style={styles.statVal}>{data.tasks.filter(t => t.completed).length}</Text>
-            <Text style={styles.statLab}>Tasks</Text>
+          <View style={styles.statBox}>
+            <Ionicons name="checkbox" size={24} color={THEME.colors.primary} />
+            <Text style={styles.statValue}>{data.tasks.filter(t => t.completed).length}</Text>
+            <Text style={styles.statLabel}>Tasks</Text>
           </View>
-          <View style={styles.statItem}>
-            <Text style={[styles.statVal, { color: '#FF8C00' }]}>{data.habits.length}</Text>
-            <Text style={styles.statLab}>Habits</Text>
+          <View style={styles.statBox}>
+            <Ionicons name="flame" size={24} color="#FF8C00" />
+            <Text style={styles.statValue}>{data.habits.length}</Text>
+            <Text style={styles.statLabel}>Habits</Text>
           </View>
-          <View style={styles.statItem}>
-            <Text style={[styles.statVal, { color: '#00C9A7' }]}>{data.goals.filter(g => g.completed).length}</Text>
-            <Text style={styles.statLab}>Goals</Text>
+          <View style={styles.statBox}>
+            <Ionicons name="trending-up" size={24} color="#00C9A7" />
+            <Text style={styles.statValue}>{data.goals.filter(g => g.completed).length}</Text>
+            <Text style={styles.statLabel}>Goals</Text>
           </View>
         </View>
 
@@ -164,13 +175,16 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Achievements */}
-        <Text style={styles.sectionTitle}>Achievements</Text>
+        {/* Achievements - Expanded System */}
+        <Text style={styles.sectionTitle}>Hall of Fame</Text>
         <View style={styles.achievementsRow}>
-          <AchievementBadge emoji="🔥" title="Consistent" sub={`${Math.max(...data.habits.map(h => h.streak), 0)} Day Streak`} locked={Math.max(...data.habits.map(h => h.streak), 0) < 3} />
-          <AchievementBadge emoji="🏆" title="Goal Crusher" sub={`${data.goals.filter(g => g.completed).length} Goals`} locked={data.goals.filter(g => g.completed).length === 0} />
+          <AchievementBadge emoji="🚀" title="Quick Starter" sub="5 Tasks Done" locked={data.tasks.filter(t => t.completed).length < 5} />
+          <AchievementBadge emoji="👑" title="Habit Master" sub="7 Day Streak" locked={Math.max(...data.habits.map(h => h.streak), 0) < 7} />
+          <AchievementBadge emoji="💰" title="Smart Saver" sub="Save ₹1000" locked={metrics?.weeklySavings === undefined || metrics.weeklySavings < 1000} />
+          <AchievementBadge emoji="🔥" title="Consistent" sub="3 Day Streak" locked={Math.max(...data.habits.map(h => h.streak), 0) < 3} />
+          <AchievementBadge emoji="🏆" title="Goal Crusher" sub="First Goal" locked={data.goals.filter(g => g.completed).length === 0} />
           <AchievementBadge emoji="⚡" title="Focused" sub="Level 5+" locked={(metrics?.level || 1) < 5} />
-          <AchievementBadge emoji="✍️" title="Reflector" sub="Daily Journal" locked={data.journalEntries.length < 5} />
+          <AchievementBadge emoji="✍️" title="Reflector" sub="5 Journals" locked={data.journalEntries.length < 5} />
         </View>
 
         <View style={{ height: 40 }} />
@@ -191,51 +205,54 @@ function AchievementBadge({ emoji, title, sub, locked }: { emoji: string; title:
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: THEME.colors.background },
-  scrollContent: { paddingHorizontal: 20 },
+  scrollContent: { padding: 20, paddingBottom: 40 },
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  headerCard: { backgroundColor: "#FFF", borderRadius: 32, padding: 32, marginTop: 10, marginBottom: 20, shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.05, shadowRadius: 20, elevation: 5 },
-  logoutBtn: { position: "absolute", top: 20, right: 20, flexDirection: "row", alignItems: "center", backgroundColor: "#FFF5F5", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
-  logoutBtnText: { color: "#FF5252", fontWeight: "700", fontSize: 13, marginLeft: 4 },
-  headerContent: { alignItems: "center" },
-  avatarWrapper: { marginBottom: 16 },
-  avatarMain: { width: 80, height: 80, borderRadius: 40, backgroundColor: THEME.colors.primary, justifyContent: "center", alignItems: "center" },
-  avatarInitial: { color: "#FFF", fontSize: 32, fontWeight: "900" },
-  onlineBadge: { position: "absolute", bottom: 4, right: 4, width: 16, height: 16, borderRadius: 8, backgroundColor: "#2ECC71", borderWidth: 3, borderColor: "#FFF" },
-  userInfo: { alignItems: "center" },
-  userName: { fontSize: 24, fontWeight: "800", color: THEME.colors.text },
-  levelBadgeText: { fontSize: 13, color: THEME.colors.textLight, fontWeight: "600", marginTop: 4 },
 
-  levelCard: { backgroundColor: "#FFF", padding: 20, borderRadius: 24, marginBottom: 20 },
-  levelInfoRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
-  levelLabel: { fontSize: 14, fontWeight: "700", color: THEME.colors.text },
-  xpValue: { fontSize: 14, color: THEME.colors.primary, fontWeight: "800" },
-  levelBarBg: { height: 8, backgroundColor: "#F3F4F6", borderRadius: 4, overflow: "hidden" },
+  dashboardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
+  greeting: { fontSize: 24, fontWeight: "800", color: THEME.colors.text },
+  levelBadgeHeader: { backgroundColor: "#FF5252", padding: 10, borderRadius: 15 },
+
+  levelProgressContainer: { marginBottom: 24 },
+  levelInfoRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
+  levelTitle: { fontSize: 16, fontWeight: "700", color: THEME.colors.text },
+  xpText: { fontSize: 14, color: THEME.colors.primary, fontWeight: "600" },
+  levelBarBg: { height: 6, backgroundColor: "#E5E7EB", borderRadius: 3, overflow: "hidden" },
   levelBarFill: { height: "100%", backgroundColor: THEME.colors.primary },
 
-  statsGrid: { flexDirection: "row", justifyContent: "space-between", marginBottom: 24 },
-  statItem: { backgroundColor: "#FFF", width: "30%", padding: 16, borderRadius: 20, alignItems: "center" },
-  statVal: { fontSize: 20, fontWeight: "900", color: THEME.colors.primary },
-  statLab: { fontSize: 12, color: THEME.colors.textLight, marginTop: 2, fontWeight: "600" },
+  titleBadgeContainer: { backgroundColor: THEME.colors.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginTop: 4, alignSelf: 'flex-start' },
+  titleBadgeText: { color: "#FFF", fontSize: 10, fontWeight: "800", textTransform: "uppercase" },
 
-  card: { backgroundColor: "#FFF", padding: 20, borderRadius: 24, marginBottom: 24 },
+  titlesScroll: { marginTop: 12 },
+  titleChoice: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, backgroundColor: "#F3F4F6", marginRight: 10, borderWidth: 1, borderColor: "#E5E7EB" },
+  titleChoiceActive: { backgroundColor: THEME.colors.primary, borderColor: THEME.colors.primary },
+  titleChoiceText: { fontSize: 13, fontWeight: "700", color: THEME.colors.textLight },
+  textWhite: { color: "#FFF" },
+
+  statsGrid: { flexDirection: "row", justifyContent: "space-between", marginBottom: 24 },
+  statBox: { backgroundColor: "#FFF", width: "30%", padding: 20, borderRadius: 28, alignItems: "center", shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 },
+  statValue: { fontSize: 20, fontWeight: "900", color: THEME.colors.primary, marginTop: 8 },
+  statLabel: { fontSize: 12, color: THEME.colors.textLight, marginTop: 4, fontWeight: "600" },
+
+  card: { backgroundColor: "#FFF", padding: 24, borderRadius: 28, marginBottom: 24, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 20, elevation: 5 },
   cardHeader: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
-  cardTitle: { fontSize: 16, fontWeight: "700", color: THEME.colors.text, marginLeft: 8 },
+  cardTitle: { fontSize: 18, fontWeight: "700", color: THEME.colors.text, marginLeft: 8 },
+
   avgBalanceContainer: { alignItems: "center", marginBottom: 20 },
-  avgBalanceVal: { fontSize: 36, fontWeight: "900", color: THEME.colors.primary },
-  avgBalanceLab: { fontSize: 12, color: THEME.colors.textLight, fontWeight: "600" },
+  avgBalanceVal: { fontSize: 40, fontWeight: "900", color: THEME.colors.primary },
+  avgBalanceLab: { fontSize: 13, color: THEME.colors.textLight, fontWeight: "600" },
   chartStyle: { marginVertical: 8, borderRadius: 16 },
   balanceSelectors: { marginTop: 10 },
-  balanceRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#F9FAFB" },
-  areaLabel: { fontSize: 14, fontWeight: "600", color: "#4B5563" },
+  balanceRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#F9FAFB" },
+  areaLabel: { fontSize: 14, fontWeight: "700", color: THEME.colors.text },
   stepperContainer: { flexDirection: "row", alignItems: "center" },
-  stepperBtn: { width: 28, height: 28, backgroundColor: "#F3F4F6", borderRadius: 8, justifyContent: "center", alignItems: "center" },
-  stepperVal: { width: 30, textAlign: "center", fontWeight: "800", color: THEME.colors.primary, fontSize: 15 },
+  stepperBtn: { width: 32, height: 32, backgroundColor: "#F3F4F6", borderRadius: 10, justifyContent: "center", alignItems: "center" },
+  stepperVal: { width: 36, textAlign: "center", fontWeight: "900", color: THEME.colors.primary, fontSize: 16 },
 
-  sectionTitle: { fontSize: 18, fontWeight: "700", color: THEME.colors.text, marginBottom: 16 },
+  sectionTitle: { fontSize: 18, fontWeight: "800", color: THEME.colors.text, marginBottom: 16 },
   achievementsRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
-  badgeCard: { width: "47%", backgroundColor: "#FFF", padding: 16, borderRadius: 20, alignItems: "center", marginBottom: 16 },
-  badgeLocked: { opacity: 0.3 },
-  badgeEmoji: { fontSize: 28, marginBottom: 8 },
-  badgeTitle: { fontSize: 14, fontWeight: "700", color: THEME.colors.text },
-  badgeSub: { fontSize: 11, color: THEME.colors.textLight, marginTop: 2 },
+  badgeCard: { width: "47%", backgroundColor: "#FFF", padding: 20, borderRadius: 24, alignItems: "center", marginBottom: 16, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 },
+  badgeLocked: { opacity: 0.2, filter: 'grayscale(1)' },
+  badgeEmoji: { fontSize: 32, marginBottom: 8 },
+  badgeTitle: { fontSize: 14, fontWeight: "800", color: THEME.colors.text, textAlign: 'center' },
+  badgeSub: { fontSize: 11, color: THEME.colors.textLight, marginTop: 4, fontWeight: "600", textAlign: 'center' },
 });

@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Habit, STORAGE_KEYS, THEME } from "../../constants/types";
+import { useGrowthData } from "../../hooks/useGrowthData";
 
 const getWeekDays = () => {
   const currentDate = new Date();
@@ -41,6 +42,7 @@ export default function HabitsScreen() {
   const [newHabitTitle, setNewHabitTitle] = useState("");
   const flatListRef = useRef<FlatList>(null);
   const [isReady, setIsReady] = useState(false);
+  const { metrics } = useGrowthData();
 
   const weekDaysDates = getWeekDays();
   const todayIndex = new Date().getDay();
@@ -152,18 +154,47 @@ export default function HabitsScreen() {
   return (
     <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       <View style={styles.container}>
-        <Text style={styles.title}>Habits</Text>
-        <View style={styles.inputRow}>
-          <TextInput
-            style={styles.input}
-            placeholder="New habit..."
-            value={newHabitTitle}
-            onChangeText={setNewHabitTitle}
-            onSubmitEditing={addHabit}
-          />
-          <TouchableOpacity style={styles.addBtn} onPress={addHabit}>
-            <Ionicons name="add" size={28} color="#FFF" />
-          </TouchableOpacity>
+
+        {/* Standardized Header */}
+        <View style={styles.dashboardHeader}>
+          <View>
+            <Text style={styles.greeting}>Habits 🌱</Text>
+            <View style={styles.titleBadgeContainer}>
+              <Text style={styles.titleBadgeText}>{metrics?.userTitle || "Growth Seeker"}</Text>
+            </View>
+          </View>
+          <View style={styles.lvlBadge}>
+            <Text style={styles.lvlText}>LVL {metrics?.level || 1}</Text>
+          </View>
+        </View>
+
+        {/* Level Progress Bar */}
+        <View style={styles.levelProgressContainer}>
+          <View style={styles.levelInfoRow}>
+            <Text style={styles.levelTitle}>{metrics?.levelTitle || "Growth Seeker"}</Text>
+            <Text style={styles.xpText}>{metrics?.xp || 0} XP</Text>
+          </View>
+          <View style={styles.levelBarBg}>
+            <View style={[styles.levelBarFill, { width: `${(metrics?.xp || 0) % 100}%` }]} />
+          </View>
+        </View>
+
+        {/* Input Section */}
+        <View style={styles.inputCard}>
+          <View style={styles.inputRow}>
+            <TextInput
+              style={styles.input}
+              placeholder="New habit..."
+              placeholderTextColor="#A0A0A0"
+              value={newHabitTitle}
+              onChangeText={setNewHabitTitle}
+              onSubmitEditing={addHabit}
+              returnKeyType="done"
+            />
+            <TouchableOpacity style={styles.addBtn} onPress={addHabit} activeOpacity={0.8}>
+              <Ionicons name="add" size={28} color="#FFF" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <FlatList
@@ -172,6 +203,7 @@ export default function HabitsScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderHabit}
           contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="leaf-outline" size={48} color="#D1D5DB" />
@@ -180,31 +212,139 @@ export default function HabitsScreen() {
           }
         />
       </View>
-    </View>
+    </View >
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: THEME.colors.background },
-  container: { flex: 1, padding: 20 },
-  title: { fontSize: 32, fontWeight: "800", color: THEME.colors.text, marginBottom: 20 },
-  inputRow: { flexDirection: "row", marginBottom: 24 },
-  input: { flex: 1, backgroundColor: "#FFF", height: 50, borderRadius: 12, paddingHorizontal: 16, marginRight: 12, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
-  addBtn: { width: 50, height: 50, backgroundColor: THEME.colors.primary, borderRadius: 12, justifyContent: "center", alignItems: "center" },
+  container: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
+  dashboardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  greeting: { fontSize: 24, fontWeight: "800", color: THEME.colors.text },
+  lvlBadge: {
+    backgroundColor: THEME.colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  lvlText: { color: "#FFF", fontWeight: "bold", fontSize: 12 },
+  levelProgressContainer: { marginBottom: 24 },
+  levelInfoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  levelTitle: { fontSize: 16, fontWeight: "700", color: THEME.colors.text },
+  xpText: { fontSize: 14, color: THEME.colors.primary, fontWeight: "600" },
+  levelBarBg: {
+    height: 6,
+    backgroundColor: "#E5E7EB",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  levelBarFill: { height: "100%", backgroundColor: THEME.colors.primary },
+  titleBadgeContainer: {
+    backgroundColor: THEME.colors.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginTop: 4,
+    alignSelf: "flex-start",
+  },
+  titleBadgeText: {
+    color: "#FFF",
+    fontSize: 10,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+  inputCard: {
+    backgroundColor: THEME.colors.white,
+    borderRadius: 28,
+    padding: 20,
+    marginBottom: 24,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
+    elevation: 5,
+  },
+  inputRow: { flexDirection: "row", alignItems: "center" },
+  input: {
+    flex: 1,
+    backgroundColor: "#F9FAFC",
+    height: 50,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    color: THEME.colors.text,
+    borderWidth: 1,
+    borderColor: "#EEEEEE",
+    marginRight: 10,
+  },
+  addBtn: {
+    width: 50,
+    height: 50,
+    backgroundColor: THEME.colors.primary,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: THEME.colors.primary,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
   list: { paddingBottom: 40 },
-  habitCard: { backgroundColor: "#FFF", borderRadius: 20, padding: 16, marginBottom: 16, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 10, elevation: 2 },
-  habitHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 },
+  habitCard: {
+    backgroundColor: THEME.colors.white,
+    borderRadius: 28,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  habitHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 16,
+  },
   habitInfo: { flex: 1 },
-  habitTitle: { fontSize: 18, fontWeight: "700", color: THEME.colors.text },
-  streakText: { fontSize: 13, color: "#FF8C00", fontWeight: "600", marginTop: 2 },
+  habitTitle: { fontSize: 18, fontWeight: "800", color: THEME.colors.text },
+  streakText: { fontSize: 13, color: "#FF8C00", fontWeight: "700", marginTop: 2 },
   weekContainer: { flexDirection: "row", justifyContent: "space-between" },
   dayCol: { alignItems: "center" },
-  dayLabel: { fontSize: 12, color: THEME.colors.textLight, marginBottom: 8, fontWeight: "600" },
-  todayLabel: { color: THEME.colors.primary, fontWeight: "800" },
-  dayCircle: { width: 34, height: 34, borderRadius: 17, justifyContent: "center", alignItems: "center" },
+  dayLabel: {
+    fontSize: 12,
+    color: THEME.colors.textLight,
+    marginBottom: 8,
+    fontWeight: "600",
+  },
+  todayLabel: { color: THEME.colors.primary, fontWeight: "900" },
+  dayCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   emptyCircle: { backgroundColor: "#F3F4F6" },
-  todayCircle: { backgroundColor: "#FFF", borderWidth: 2, borderColor: THEME.colors.primary },
+  todayCircle: {
+    backgroundColor: "#FFF",
+    borderWidth: 2,
+    borderColor: THEME.colors.primary,
+  },
   completedCircle: { backgroundColor: THEME.colors.primary },
   empty: { alignItems: "center", marginTop: 60 },
-  emptyText: { color: THEME.colors.textLight, marginTop: 12, fontSize: 16 },
+  emptyText: {
+    color: THEME.colors.textLight,
+    marginTop: 12,
+    fontSize: 16,
+    fontWeight: "600",
+  },
 });

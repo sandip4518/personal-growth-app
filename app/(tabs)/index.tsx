@@ -25,7 +25,7 @@ const QUOTES = [
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { loading, data, metrics, refresh } = useGrowthData();
+  const { loading, data, metrics, refresh, completeQuest } = useGrowthData();
   const [quote, setQuote] = useState(QUOTES[0]);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -76,14 +76,14 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>{greeting}, {data.userName} 👋</Text>
-            <Text style={styles.date}>{todayDateStr}</Text>
+            <Text style={styles.userTitleBadge}>{metrics?.userTitle || "Growth Seeker"}</Text>
           </View>
           <TouchableOpacity style={styles.levelBadge} onPress={() => router.push("/profile")}>
             <Text style={styles.levelText}>LVL {metrics?.level || 1}</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Level Progress Bar (Premium Touch) */}
+        {/* Restore Level Progress Bar */}
         <View style={styles.levelProgressContainer}>
           <View style={styles.levelInfoRow}>
             <Text style={styles.levelTitle}>{metrics?.levelTitle || "Growth Seeker"}</Text>
@@ -94,16 +94,115 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* Daily Quest Card */}
+        {metrics?.activeQuest && (
+          <TouchableOpacity
+            onPress={() => {
+              if (metrics.activeQuest?.isClaimed) return;
+              const route = metrics.activeQuest?.type === "tasks" ? "/tasks" :
+                metrics.activeQuest?.type === "habits" ? "/habits" :
+                  metrics.activeQuest?.type === "finance" ? "/finance" : "/journal";
+              router.push(route as any);
+            }}
+            activeOpacity={0.8}
+            style={[styles.questCard, metrics.activeQuest.isClaimed && styles.questCardCompleted]}
+          >
+            <View style={styles.questHeader}>
+              <View style={styles.questInfo}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={styles.questLabel}>Daily Quest 💎</Text>
+                  {!metrics.activeQuest.isFinished && !metrics.activeQuest.isClaimed && (
+                    <View style={styles.progressTag}>
+                      <Text style={styles.progressTagText}>IN PROGRESS</Text>
+                    </View>
+                  )}
+                  {metrics.activeQuest.isFinished && !metrics.activeQuest.isClaimed && (
+                    <View style={[styles.progressTag, { backgroundColor: THEME.colors.secondary + '40' }]}>
+                      <Text style={[styles.progressTagText, { color: '#065F46' }]}>FINISHED</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.questTitle}>{metrics.activeQuest.title}</Text>
+              </View>
+              {metrics.activeQuest.isClaimed ? (
+                <View style={[styles.questCompleteBtn, { backgroundColor: '#E5E7EB' }]}>
+                  <Text style={[styles.questBtnText, { color: '#9CA3AF' }]}>Claimed</Text>
+                </View>
+              ) : metrics.activeQuest.isFinished ? (
+                <TouchableOpacity
+                  style={styles.questCompleteBtn}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    completeQuest(metrics.activeQuest!.id);
+                  }}
+                >
+                  <Text style={styles.questBtnText}>Claim +{metrics.activeQuest.rewardXP} XP</Text>
+                </TouchableOpacity>
+              ) : (
+                <Ionicons name="arrow-forward-circle" size={32} color={THEME.colors.primary} />
+              )}
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {/* Growth Statistics Row */}
+        <View style={styles.dateRow}>
+          <Text style={styles.date}>{todayDateStr}</Text>
+        </View>
+
         {/* Main Growth Card */}
         <View style={styles.growthCard}>
           <View style={styles.growthHeader}>
-            <Text style={styles.growthLabel}>Growth Score</Text>
-            <Text style={styles.growthScore}>{metrics?.personalGrowthScore || 0}%</Text>
+            <View>
+              <Text style={styles.growthLabel}>Growth Score</Text>
+              <Text style={styles.growthValue}>{metrics?.personalGrowthScore || 0}%</Text>
+            </View>
+            <View style={styles.growthIconCircle}>
+              <Ionicons name="rocket" size={28} color="#FFF" />
+            </View>
           </View>
+
           <View style={styles.growthBarBg}>
             <View style={[styles.growthBarFill, { width: `${metrics?.personalGrowthScore || 0}%` }]} />
           </View>
-          <Text style={styles.growthInsight}>{getSmartInsight()}</Text>
+
+          <View style={styles.insightBox}>
+            <Ionicons name="bulb" size={18} color={THEME.colors.secondary} style={{ marginRight: 8 }} />
+            <Text style={styles.growthInsight}>{getSmartInsight()}</Text>
+          </View>
+        </View>
+
+        {/* Restore Weekly Summary */}
+        <Text style={styles.sectionTitle}>Weekly Summary</Text>
+        <View style={styles.weeklyCard}>
+          <View style={styles.weeklyHeader}>
+            <View>
+              <Text style={styles.weeklyLabel}>Productivity</Text>
+              <Text style={styles.weeklyValue}>{metrics?.weeklyProductivityScore || 0}%</Text>
+            </View>
+            <View style={styles.weeklyBarContainer}>
+              <View style={[styles.weeklyBarFill, { width: `${metrics?.weeklyProductivityScore || 0}%` }]} />
+            </View>
+          </View>
+
+          <View style={styles.weeklyGrid}>
+            <View style={styles.weeklyItem}>
+              <Text style={styles.weeklyStat}>{metrics?.weeklyTasksDone || 0}</Text>
+              <Text style={styles.weeklySub}>Tasks</Text>
+            </View>
+            <View style={styles.weeklyItem}>
+              <Text style={styles.weeklyStat}>{metrics?.weeklyHabitsDone || 0}</Text>
+              <Text style={styles.weeklySub}>Habits</Text>
+            </View>
+            <View style={styles.weeklyItem}>
+              <Text style={[styles.weeklyStat, { color: '#059669' }]}>₹{metrics?.weeklySavings || 0}</Text>
+              <Text style={styles.weeklySub}>Saved</Text>
+            </View>
+            <View style={styles.weeklyItem}>
+              <Text style={[styles.weeklyStat, { color: '#DC2626' }]}>₹{metrics?.weeklyExpenses || 0}</Text>
+              <Text style={styles.weeklySub}>Spent</Text>
+            </View>
+          </View>
         </View>
 
         {/* Stats Grid */}
@@ -111,12 +210,12 @@ export default function HomeScreen() {
           <View style={styles.statBox}>
             <Ionicons name="checkbox" size={24} color={THEME.colors.primary} />
             <Text style={styles.statValue}>{Math.round((metrics?.tasksProgress || 0) * 100)}%</Text>
-            <Text style={styles.statLabel}>Tasks</Text>
+            <Text style={styles.statLabel}>Daily Tasks</Text>
           </View>
           <View style={styles.statBox}>
             <Ionicons name="flame" size={24} color="#FF8C00" />
             <Text style={styles.statValue}>{Math.round((metrics?.habitsProgress || 0) * 100)}%</Text>
-            <Text style={styles.statLabel}>Habits</Text>
+            <Text style={styles.statLabel}>Daily Habits</Text>
           </View>
           <View style={styles.statBox}>
             <Ionicons name="trending-up" size={24} color="#00C9A7" />
@@ -185,30 +284,57 @@ const styles = StyleSheet.create({
   levelBarBg: { height: 6, backgroundColor: "#E5E7EB", borderRadius: 3, overflow: "hidden" },
   levelBarFill: { height: "100%", backgroundColor: THEME.colors.primary },
 
-  growthCard: { backgroundColor: THEME.colors.white, borderRadius: 24, padding: 24, marginBottom: 24, shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.05, shadowRadius: 20, elevation: 5 },
-  growthHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 },
-  growthLabel: { fontSize: 16, color: THEME.colors.textLight, fontWeight: "600" },
-  growthScore: { fontSize: 32, fontWeight: "900", color: THEME.colors.text },
-  growthBarBg: { height: 12, backgroundColor: "#F3F4F6", borderRadius: 6, overflow: "hidden", marginBottom: 16 },
+  userTitleBadge: { fontSize: 13, fontWeight: "700", color: THEME.colors.primary, marginTop: 4, textTransform: "uppercase", letterSpacing: 0.5 },
+  dateRow: { marginBottom: 16 },
+
+  questCard: { backgroundColor: "#FFF", borderRadius: 24, padding: 20, marginBottom: 20, borderWidth: 2, borderColor: THEME.colors.primary, shadowColor: THEME.colors.primary, shadowOpacity: 0.1, shadowRadius: 20, elevation: 4 },
+  questCardCompleted: { borderColor: THEME.colors.secondary, shadowColor: THEME.colors.secondary, opacity: 0.8 },
+  questHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  questInfo: { flex: 1 },
+  questLabel: { fontSize: 11, fontWeight: "800", color: THEME.colors.textLight, textTransform: "uppercase", marginBottom: 4 },
+  progressTag: { backgroundColor: THEME.colors.secondary + '20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 8 },
+  progressTagText: { fontSize: 9, fontWeight: "800", color: THEME.colors.secondary },
+  questTitle: { fontSize: 18, fontWeight: "800", color: THEME.colors.text },
+  questCompleteBtn: { backgroundColor: THEME.colors.primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
+  questBtnText: { color: "#FFF", fontWeight: "700", fontSize: 12 },
+
+  growthCard: { backgroundColor: THEME.colors.white, borderRadius: 28, padding: 24, marginBottom: 24, shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.05, shadowRadius: 20, elevation: 5, borderWidth: 1, borderColor: "#F3F4F6" },
+  growthHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
+  growthLabel: { fontSize: 14, color: THEME.colors.textLight, fontWeight: "700", textTransform: "uppercase" },
+  growthValue: { fontSize: 36, fontWeight: "900", color: THEME.colors.text, marginTop: 4 },
+  growthIconCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: THEME.colors.secondary, justifyContent: "center", alignItems: "center", shadowColor: THEME.colors.secondary, shadowOpacity: 0.3, shadowRadius: 10 },
+  growthBarBg: { height: 10, backgroundColor: "#F3F4F6", borderRadius: 5, overflow: "hidden", marginBottom: 20 },
   growthBarFill: { height: "100%", backgroundColor: THEME.colors.secondary },
-  growthInsight: { fontSize: 14, color: THEME.colors.textLight, lineHeight: 20, fontStyle: "italic" },
+  insightBox: { flexDirection: "row", alignItems: "center", backgroundColor: "#F0FDF4", padding: 12, borderRadius: 16 },
+  growthInsight: { flex: 1, fontSize: 13, color: "#166534", lineHeight: 18, fontWeight: "600" },
 
   statsGrid: { flexDirection: "row", justifyContent: "space-between", marginBottom: 24 },
-  statBox: { backgroundColor: THEME.colors.white, width: '30%', padding: 16, borderRadius: 20, alignItems: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 10, elevation: 2 },
+  statBox: { backgroundColor: THEME.colors.white, width: '30%', padding: 20, borderRadius: 28, alignItems: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 10, elevation: 2 },
   statValue: { fontSize: 18, fontWeight: "800", color: THEME.colors.text, marginTop: 8 },
-  statLabel: { fontSize: 12, color: THEME.colors.textLight, marginTop: 2 },
+  statLabel: { fontSize: 12, color: THEME.colors.textLight, marginTop: 4, fontWeight: "600" },
 
-  quoteCard: { backgroundColor: "#F9FAFB", borderRadius: 20, padding: 20, marginBottom: 24, borderLeftWidth: 4, borderLeftColor: THEME.colors.primary },
+  quoteCard: { backgroundColor: "#F9FAFB", borderRadius: 28, padding: 24, marginBottom: 24, borderLeftWidth: 4, borderLeftColor: THEME.colors.primary },
   quoteText: { fontSize: 16, color: THEME.colors.text, fontWeight: "600", lineHeight: 24, marginBottom: 8 },
   quoteAuthor: { fontSize: 14, color: THEME.colors.textLight, fontWeight: "500" },
+
+  weeklyCard: { backgroundColor: "#FFF", borderRadius: 28, padding: 24, marginBottom: 24, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 20, elevation: 5 },
+  weeklyHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
+  weeklyLabel: { fontSize: 14, color: THEME.colors.textLight, fontWeight: "700", textTransform: "uppercase" },
+  weeklyValue: { fontSize: 24, fontWeight: "900", color: THEME.colors.text },
+  weeklyBarContainer: { flex: 1, height: 8, backgroundColor: "#F3F4F6", borderRadius: 4, marginLeft: 20, overflow: "hidden" },
+  weeklyBarFill: { height: "100%", backgroundColor: THEME.colors.primary },
+  weeklyGrid: { flexDirection: "row", justifyContent: "space-between" },
+  weeklyItem: { alignItems: "center" },
+  weeklyStat: { fontSize: 16, fontWeight: "800", color: THEME.colors.text },
+  weeklySub: { fontSize: 11, color: THEME.colors.textLight, marginTop: 4, fontWeight: "600" },
 
   sectionTitle: { fontSize: 18, fontWeight: "700", color: THEME.colors.text, marginBottom: 16 },
   actionsRow: { paddingRight: 20, marginBottom: 24 },
   actionBtn: { alignItems: "center", marginRight: 24 },
-  actionIcon: { width: 56, height: 56, borderRadius: 16, justifyContent: "center", alignItems: "center", marginBottom: 8 },
+  actionIcon: { width: 56, height: 56, borderRadius: 20, justifyContent: "center", alignItems: "center", marginBottom: 8 },
   actionLabel: { fontSize: 13, fontWeight: "600", color: THEME.colors.text },
 
-  focusCard: { backgroundColor: "#1F2937", borderRadius: 24, padding: 20, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  focusCard: { backgroundColor: "#1F2937", borderRadius: 28, padding: 24, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   focusInfo: { flex: 1 },
   focusTitle: { color: "#FFF", fontSize: 18, fontWeight: "700", marginBottom: 4 },
   focusSub: { color: "#9CA3AF", fontSize: 13 },

@@ -42,6 +42,22 @@ export interface JournalEntry {
     reflection: string;
 }
 
+export interface Quest {
+    id: string;
+    title: string;
+    rewardXP: number;
+    type: "tasks" | "habits" | "finance" | "journal";
+    targetCount: number;
+    completed: boolean;
+    date: string; // The date this quest was generated for
+}
+
+export interface UserRewardData {
+    currentTitle: string;
+    unlockedTitles: string[];
+    completedQuestIds: string[];
+}
+
 export const STORAGE_KEYS = {
     TASKS: "tasks_storage",
     HABITS: "HABITS_STORAGE",
@@ -50,6 +66,8 @@ export const STORAGE_KEYS = {
     JOURNAL: "JOURNAL_STORAGE",
     USER_DATA: "USER_DATA",
     LOGGED_IN: "USER_LOGGED_IN",
+    REWARDS: "USER_REWARDS_STORAGE",
+    QUESTS: "DAILY_QUESTS_STORAGE",
 };
 
 export const THEME = {

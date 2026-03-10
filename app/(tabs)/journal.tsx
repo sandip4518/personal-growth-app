@@ -3,6 +3,8 @@ import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { FlatList, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { THEME } from '../../constants/types';
+import { useGrowthData } from '../../hooks/useGrowthData';
 
 interface JournalEntry {
     id: string;
@@ -26,6 +28,7 @@ export default function JournalScreen() {
     const [entries, setEntries] = useState<JournalEntry[]>([]);
     const [selectedMood, setSelectedMood] = useState<string>('🙂');
     const [reflection, setReflection] = useState<string>('');
+    const { metrics } = useGrowthData();
 
     const loadEntries = async () => {
         try {
@@ -88,10 +91,32 @@ export default function JournalScreen() {
                 keyExtractor={(item) => item.id}
                 renderItem={renderEntry}
                 contentContainerStyle={styles.container}
+                showsVerticalScrollIndicator={false}
                 ListHeaderComponent={
                     <View style={styles.headerContainer}>
-                        <Text style={styles.title}>Daily Journal</Text>
-                        <Text style={styles.subtitle}>Reflect on your day and track your mood</Text>
+                        {/* Standardized Header */}
+                        <View style={styles.dashboardHeader}>
+                            <View>
+                                <Text style={styles.greeting}>Journal 📓</Text>
+                                <View style={styles.titleBadgeContainer}>
+                                    <Text style={styles.titleBadgeText}>{metrics?.userTitle || "Growth Seeker"}</Text>
+                                </View>
+                            </View>
+                            <View style={styles.lvlBadge}>
+                                <Text style={styles.lvlText}>LVL {metrics?.level || 1}</Text>
+                            </View>
+                        </View>
+
+                        {/* Level Progress Bar */}
+                        <View style={styles.levelProgressContainer}>
+                            <View style={styles.levelInfoRow}>
+                                <Text style={styles.levelTitle}>{metrics?.levelTitle || "Growth Seeker"}</Text>
+                                <Text style={styles.xpText}>{metrics?.xp || 0} XP</Text>
+                            </View>
+                            <View style={styles.levelBarBg}>
+                                <View style={[styles.levelBarFill, { width: `${(metrics?.xp || 0) % 100}%` }]} />
+                            </View>
+                        </View>
 
                         <View style={styles.inputCard}>
                             <Text style={styles.label}>How are you feeling?</Text>
@@ -112,7 +137,7 @@ export default function JournalScreen() {
                             <TextInput
                                 style={styles.textInput}
                                 placeholder="What went well today?"
-                                placeholderTextColor="#999"
+                                placeholderTextColor="#A0A0A0"
                                 multiline
                                 textAlignVertical="top"
                                 value={reflection}
@@ -123,6 +148,7 @@ export default function JournalScreen() {
                                 style={[styles.saveButton, !reflection.trim() && styles.saveButtonDisabled]}
                                 onPress={handleSave}
                                 disabled={!reflection.trim()}
+                                activeOpacity={0.8}
                             >
                                 <Text style={styles.saveButtonText}>Save Entry</Text>
                             </TouchableOpacity>
@@ -139,143 +165,195 @@ export default function JournalScreen() {
             />
         </KeyboardAvoidingView>
     );
+
 }
 
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: '#F5F7FB',
+        backgroundColor: THEME.colors.background,
     },
     container: {
         paddingHorizontal: 20,
         paddingBottom: 40,
-    },
-    headerContainer: {
         paddingTop: 16,
     },
-    title: {
-        fontSize: 32,
-        fontWeight: '800',
-        color: '#1A1A1A',
+    headerContainer: {
+        // paddingTop removed as container handles it
     },
-    subtitle: {
-        fontSize: 16,
-        color: '#666666',
+    dashboardHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 20,
+    },
+    greeting: { fontSize: 24, fontWeight: "800", color: THEME.colors.text },
+    lvlBadge: {
+        backgroundColor: THEME.colors.primary,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+    },
+    lvlText: { color: "#FFF", fontWeight: "bold", fontSize: 12 },
+    levelProgressContainer: { marginBottom: 24 },
+    levelInfoRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        marginBottom: 8,
+    },
+    levelTitle: { fontSize: 16, fontWeight: "700", color: THEME.colors.text },
+    xpText: { fontSize: 14, color: THEME.colors.primary, fontWeight: "600" },
+    levelBarBg: {
+        height: 6,
+        backgroundColor: "#E5E7EB",
+        borderRadius: 3,
+        overflow: "hidden",
+    },
+    levelBarFill: { height: "100%", backgroundColor: THEME.colors.primary },
+    titleBadgeContainer: {
+        backgroundColor: THEME.colors.primary,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 20,
         marginTop: 4,
-        marginBottom: 24,
+        alignSelf: "flex-start",
+    },
+    titleBadgeText: {
+        color: "#FFF",
+        fontSize: 10,
+        fontWeight: "800",
+        textTransform: "uppercase",
     },
     inputCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 20,
-        padding: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
-        shadowRadius: 8,
-        elevation: 2,
+        backgroundColor: THEME.colors.white,
+        borderRadius: 28,
+        padding: 24,
         marginBottom: 24,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 20,
+        elevation: 5,
     },
     label: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333333',
-        marginBottom: 12,
+        fontSize: 18,
+        fontWeight: '800',
+        color: THEME.colors.text,
+        marginBottom: 16,
     },
     moodSelector: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 24,
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        gap: 8,
+        marginBottom: 30,
+        backgroundColor: '#F9FAFC',
+        padding: 12,
+        borderRadius: 24,
     },
     moodOption: {
         alignItems: 'center',
-        padding: 8,
-        borderRadius: 12,
-        borderWidth: 1,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 18,
+        borderWidth: 2,
         borderColor: 'transparent',
+        minWidth: 60,
     },
     moodOptionSelected: {
-        backgroundColor: '#E8E6FF',
-        borderColor: '#6C63FF',
+        backgroundColor: '#FFFFFF',
+        borderColor: THEME.colors.primary,
+        shadowColor: THEME.colors.primary,
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        elevation: 2,
     },
     moodEmoji: {
-        fontSize: 28,
+        fontSize: 32,
         marginBottom: 4,
     },
     moodLabel: {
-        fontSize: 12,
-        color: '#888888',
+        fontSize: 11,
+        color: THEME.colors.textLight,
+        fontWeight: '700',
     },
     moodLabelSelected: {
-        color: '#6C63FF',
-        fontWeight: 'bold',
+        color: THEME.colors.primary,
     },
     textInput: {
         backgroundColor: '#F9FAFC',
         borderWidth: 1,
         borderColor: '#EEEEEE',
-        borderRadius: 12,
+        borderRadius: 20,
         padding: 16,
         fontSize: 16,
-        color: '#333333',
-        minHeight: 120,
+        color: THEME.colors.text,
+        minHeight: 140,
         marginBottom: 20,
+        textAlignVertical: 'top',
     },
     saveButton: {
-        backgroundColor: '#6C63FF',
-        paddingVertical: 16,
-        borderRadius: 12,
+        backgroundColor: THEME.colors.primary,
+        paddingVertical: 18,
+        borderRadius: 16,
         alignItems: 'center',
+        shadowColor: THEME.colors.primary,
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        elevation: 4,
     },
     saveButtonDisabled: {
-        backgroundColor: '#A5A1FF',
+        backgroundColor: '#B8B3FF',
     },
     saveButtonText: {
         color: '#FFFFFF',
         fontSize: 16,
-        fontWeight: 'bold',
+        fontWeight: '900',
     },
     sectionTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#1A1A1A',
+        fontSize: 22,
+        fontWeight: '900',
+        color: THEME.colors.text,
         marginBottom: 16,
+        marginLeft: 4,
     },
     entryCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 16,
-        padding: 16,
-        marginBottom: 12,
+        backgroundColor: THEME.colors.white,
+        borderRadius: 24,
+        padding: 20,
+        marginBottom: 16,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.03,
-        shadowRadius: 4,
-        elevation: 1,
+        shadowOpacity: 0.04,
+        shadowRadius: 10,
+        elevation: 3,
     },
     entryHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 8,
+        marginBottom: 12,
     },
     entryDate: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#666666',
+        fontSize: 15,
+        fontWeight: '700',
+        color: THEME.colors.textLight,
     },
     entryMood: {
-        fontSize: 20,
+        fontSize: 24,
     },
     entryReflection: {
-        fontSize: 15,
-        color: '#333333',
-        lineHeight: 22,
+        fontSize: 16,
+        color: THEME.colors.text,
+        lineHeight: 24,
+        fontWeight: '500',
     },
     emptyContainer: {
         alignItems: 'center',
-        paddingVertical: 40,
+        paddingVertical: 80,
     },
     emptyText: {
         fontSize: 16,
-        color: '#A0A0A0',
+        color: THEME.colors.textLight,
+        fontWeight: '600',
     },
 });
+
