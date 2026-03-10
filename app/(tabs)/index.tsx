@@ -245,6 +245,42 @@ export default function HomeScreen() {
     return !g.completed && g.currentValue < g.targetValue;
   }).slice(0, 2);
 
+  // --- WEEKLY SUMMARY CALCS ---
+  const weekDateStrs = weekDays.map((d) => formatDate(d));
+
+  const weeklyTasksCompleted = completedTasks; // Tasks don't have dates, using all currently completed
+
+  const weeklyHabitsCompleted = habits.reduce((sum, h) => {
+    if (!h.completedDates) return sum;
+    return sum + h.completedDates.filter((d) => weekDateStrs.includes(d)).length;
+  }, 0);
+
+  const weeklyExpenses = transactions
+    .filter((t) => t.type === "expense" && weekDateStrs.includes(t.date))
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const weeklyIncome = transactions
+    .filter((t) => t.type === "income" && weekDateStrs.includes(t.date))
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const weeklySavings = weeklyIncome - weeklyExpenses;
+
+  const weeklyTasksProgress = totalTasks === 0 ? 0 : weeklyTasksCompleted / totalTasks;
+  const totalPossibleWeeklyHabits = totalHabits * 7;
+  const weeklyHabitsProgress = totalPossibleWeeklyHabits === 0 ? 0 : weeklyHabitsCompleted / totalPossibleWeeklyHabits;
+
+  let weeklyScore = 0;
+  if (totalTasks === 0 && totalHabits === 0) {
+    weeklyScore = 0;
+  } else if (totalTasks === 0) {
+    weeklyScore = weeklyHabitsProgress * 100;
+  } else if (totalHabits === 0) {
+    weeklyScore = weeklyTasksProgress * 100;
+  } else {
+    weeklyScore = (weeklyTasksProgress * 60) + (weeklyHabitsProgress * 40);
+  }
+  const weeklyScoreInt = Math.round(weeklyScore);
+
   // 7. REMINDERS
   const uncompletedTasks = tasks.filter((t) => !t.completed);
   const uncompletedHabits = habits.filter(
@@ -494,6 +530,45 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* Weekly Summary */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Weekly Summary</Text>
+
+          <View style={styles.weeklyGrid}>
+            <View style={styles.weeklyStatBox}>
+              <Text style={styles.weeklyStatLabel}>Tasks Completed</Text>
+              <Text style={styles.weeklyStatValue}>{weeklyTasksCompleted}</Text>
+            </View>
+            <View style={styles.weeklyStatBox}>
+              <Text style={styles.weeklyStatLabel}>Habits Completed</Text>
+              <Text style={styles.weeklyStatValue}>{weeklyHabitsCompleted}</Text>
+            </View>
+            <View style={styles.weeklyStatBox}>
+              <Text style={styles.weeklyStatLabel}>Money Spent</Text>
+              <Text style={styles.weeklyStatValue}>₹{weeklyExpenses.toLocaleString("en-IN")}</Text>
+            </View>
+            <View style={styles.weeklyStatBox}>
+              <Text style={styles.weeklyStatLabel}>Savings Added</Text>
+              <Text style={styles.weeklyStatValue}>₹{weeklySavings.toLocaleString("en-IN")}</Text>
+            </View>
+          </View>
+
+          <View style={[styles.progressItem, { marginTop: 16, marginBottom: 0 }]}>
+            <View style={styles.progressHeader}>
+              <Text style={styles.progressLabel}>Weekly Productivity Score</Text>
+              <Text style={styles.progressRatio}>{weeklyScoreInt}%</Text>
+            </View>
+            <View style={styles.progressBarBg}>
+              <View
+                style={[
+                  styles.progressBarFill,
+                  { width: `${weeklyScoreInt}%`, backgroundColor: "#6C63FF" },
+                ]}
+              />
+            </View>
+          </View>
+        </View>
+
         {/* Quick Actions */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Quick Actions</Text>
@@ -531,7 +606,19 @@ export default function HomeScreen() {
               >
                 <Ionicons name="wallet-outline" size={24} color="#FF8C00" />
               </View>
-              <Text style={styles.actionText}>Add Expense</Text>
+              <Text style={styles.actionText}>Expense</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={() => router.push("/journal")}
+            >
+              <View
+                style={[styles.actionIconBg, { backgroundColor: "#E5F0FF" }]}
+              >
+                <Ionicons name="book-outline" size={24} color="#007BFF" />
+              </View>
+              <Text style={styles.actionText}>Journal</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -921,5 +1008,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#6C63FF",
     letterSpacing: 2,
+  },
+  weeklyGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+  weeklyStatBox: {
+    width: "48%",
+    backgroundColor: "#F5F7FB",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  weeklyStatLabel: {
+    fontSize: 13,
+    color: "#666",
+    fontWeight: "500",
+    marginBottom: 8,
+  },
+  weeklyStatValue: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1A1A1A",
   },
 });

@@ -71,6 +71,13 @@ export default function TabsLayout() {
           ),
         }}
       />
+
+      <Tabs.Screen
+        name="journal"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

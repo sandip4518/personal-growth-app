@@ -121,6 +121,76 @@ const scheduleHabitNotifications = async (habits: Habit[]) => {
   });
 };
 
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+const HabitHeatmap = ({ habits }: { habits: Habit[] }) => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDay = new Date(year, month, 1).getDay();
+  const monthName = MONTH_NAMES[month];
+
+  const blanks = Array.from({ length: firstDay }, (_, i) => null);
+  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const grid = [...blanks, ...days];
+  const todayStr = formatDate(today);
+
+  return (
+    <View style={styles.heatmapCard}>
+      <Text style={styles.heatmapTitle}>{monthName}</Text>
+      <View style={styles.heatmapGrid}>
+        {grid.map((day, index) => {
+          if (day === null) {
+            return <View key={`blank-${index}`} style={styles.heatmapCellBlank} />;
+          }
+          const dateObj = new Date(year, month, day);
+          const dateStr = formatDate(dateObj);
+          const isToday = dateStr === todayStr;
+          const isFuture = dateStr > todayStr;
+
+          let count = 0;
+          habits.forEach(h => {
+            if (h.completedDates?.includes(dateStr)) count++;
+          });
+
+          let backgroundColor = "#E0E0E0"; // Missed day -> light gray
+          if (isFuture) {
+            backgroundColor = "#F5F5F5"; // Future day
+          } else if (count > 0) {
+            const activeHabits = habits.length;
+            const intensity = activeHabits > 0 ? count / activeHabits : 0;
+            if (intensity <= 0.33) backgroundColor = "#A7F3D0";
+            else if (intensity <= 0.66) backgroundColor = "#34D399";
+            else if (intensity < 1) backgroundColor = "#10B981";
+            else backgroundColor = "#059669";
+          }
+
+          return (
+            <View
+              key={`day-${day}`}
+              style={[
+                styles.heatmapCell,
+                { backgroundColor },
+                isToday && styles.heatmapCellToday
+              ]}
+            >
+              <Text style={[
+                styles.heatmapCellText,
+                isToday && styles.heatmapCellTextToday,
+                count > 0 && styles.heatmapCellTextCompleted
+              ]}>
+                {day}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+};
+
 export default function HabitsScreen() {
   const insets = useSafeAreaInsets();
   const [habits, setHabits] = useState<Habit[]>([]);
@@ -334,6 +404,9 @@ export default function HabitsScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Heatmap Section */}
+        <HabitHeatmap habits={habits} />
+
         {/* Input Section */}
         <View style={styles.inputContainer}>
           <TextInput
@@ -401,6 +474,55 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#666666",
     marginTop: 4,
+  },
+  heatmapCard: {
+    backgroundColor: "#FFFFFF",
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  heatmapTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1A1A1A",
+    marginBottom: 12,
+  },
+  heatmapGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  heatmapCell: {
+    width: 28,
+    height: 28,
+    borderRadius: 4,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  heatmapCellBlank: {
+    width: 28,
+    height: 28,
+  },
+  heatmapCellToday: {
+    borderWidth: 2,
+    borderColor: "#1A1A1A",
+  },
+  heatmapCellText: {
+    fontSize: 12,
+    color: "#666666",
+    fontWeight: "500",
+  },
+  heatmapCellTextToday: {
+    fontWeight: "800",
+    color: "#1A1A1A",
+  },
+  heatmapCellTextCompleted: {
+    color: "#105436",
   },
   testButton: {
     flexDirection: "row",
