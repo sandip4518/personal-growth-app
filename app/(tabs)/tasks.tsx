@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Haptics from "expo-haptics";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -11,21 +12,13 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-interface Task {
-  id: string;
-  title: string;
-  completed: boolean;
-}
-
-const TASK_STORAGE_KEY = "tasks_storage";
-const FOCUS_SESSIONS_STORAGE_KEY = "focus_sessions_storage";
-const FOCUS_DATE_STORAGE_KEY = "focus_date_storage";
+import { STORAGE_KEYS, Task, THEME } from "../../constants/types";
 
 export default function TasksScreen() {
   const insets = useSafeAreaInsets();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskPriority, setNewTaskPriority] = useState<"high" | "medium" | "low">("medium");
   const flatListRef = useRef<FlatList>(null);
   const [isReady, setIsReady] = useState(false);
 
@@ -39,17 +32,17 @@ export default function TasksScreen() {
   useEffect(() => {
     const loadFocusData = async () => {
       try {
-        const storedDate = await AsyncStorage.getItem(FOCUS_DATE_STORAGE_KEY);
+        const storedDate = await AsyncStorage.getItem("focus_date_storage");
         const today = new Date().toDateString();
 
         if (storedDate === today) {
-          const storedSessions = await AsyncStorage.getItem(FOCUS_SESSIONS_STORAGE_KEY);
+          const storedSessions = await AsyncStorage.getItem("focus_sessions_storage");
           if (storedSessions) {
             setFocusSessionsToday(parseInt(storedSessions, 10));
           }
         } else {
-          await AsyncStorage.setItem(FOCUS_DATE_STORAGE_KEY, today);
-          await AsyncStorage.setItem(FOCUS_SESSIONS_STORAGE_KEY, "0");
+          await AsyncStorage.setItem("focus_date_storage", today);
+          await AsyncStorage.setItem("focus_sessions_storage", "0");
         }
       } catch (error) {
         console.error("Failed to load focus data:", error);
@@ -78,13 +71,14 @@ export default function TasksScreen() {
   }, [isActive, timeLeft]);
 
   const handleFocusComplete = async () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Alert.alert("Focus session complete!");
     try {
       const newCount = focusSessionsToday + 1;
       setFocusSessionsToday(newCount);
-      await AsyncStorage.setItem(FOCUS_SESSIONS_STORAGE_KEY, newCount.toString());
+      await AsyncStorage.setItem("focus_sessions_storage", newCount.toString());
       const today = new Date().toDateString();
-      await AsyncStorage.setItem(FOCUS_DATE_STORAGE_KEY, today);
+      await AsyncStorage.setItem("focus_date_storage", today);
     } catch (error) {
       console.error("Failed to save focus data:", error);
     }
@@ -100,7 +94,7 @@ export default function TasksScreen() {
   useEffect(() => {
     const loadTasks = async () => {
       try {
-        const storedTasks = await AsyncStorage.getItem(TASK_STORAGE_KEY);
+        const storedTasks = await AsyncStorage.getItem(STORAGE_KEYS.TASKS);
         if (storedTasks) {
           setTasks(JSON.parse(storedTasks));
         }
@@ -116,11 +110,9 @@ export default function TasksScreen() {
   // Save tasks on change
   useEffect(() => {
     const saveTasks = async () => {
-      // Don't save before the initial load is complete
       if (!isReady) return;
-
       try {
-        await AsyncStorage.setItem(TASK_STORAGE_KEY, JSON.stringify(tasks));
+        await AsyncStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(tasks));
       } catch (error) {
         console.error("Failed to save tasks to AsyncStorage:", error);
       }
@@ -135,21 +127,30 @@ export default function TasksScreen() {
       id: Date.now().toString(),
       title: newTaskTitle.trim(),
       completed: false,
+      priority: newTaskPriority,
+      createdAt: new Date().toISOString(),
     };
 
     setTasks((prevTasks) => [...prevTasks, newTask]);
     setNewTaskTitle("");
+    setNewTaskPriority("medium");
 
-    // Scroll to the new item with a slight delay to ensure it's rendered
     setTimeout(() => {
       flatListRef.current?.scrollToEnd({ animated: true });
     }, 100);
   };
 
   const toggleComplete = (id: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setTasks((prevTasks) =>
       prevTasks.map((task) =>
-        task.id === id ? { ...task, completed: !task.completed } : task
+        task.id === id
+          ? {
+            ...task,
+            completed: !task.completed,
+            completedAt: !task.completed ? new Date().toISOString() : undefined
+          }
+          : task
       )
     );
   };
@@ -168,23 +169,38 @@ export default function TasksScreen() {
         <Ionicons
           name={item.completed ? "checkmark-circle" : "ellipse-outline"}
           size={26}
-          color={item.completed ? "#6C63FF" : "#C0C0C0"}
+          color={item.completed ? THEME.colors.primary : "#C0C0C0"}
         />
       </TouchableOpacity>
 
-      <Text
-        style={[styles.taskTitle, item.completed && styles.taskTitleCompleted]}
-        numberOfLines={2}
-      >
-        {item.title}
-      </Text>
+      <View style={{ flex: 1 }}>
+        <Text
+          style={[styles.taskTitle, item.completed && styles.taskTitleCompleted]}
+          numberOfLines={2}
+        >
+          {item.title}
+        </Text>
+        <View style={styles.taskFooter}>
+          <View style={[
+            styles.priorityBadge,
+            { backgroundColor: item.priority === "high" ? "#FFE5E5" : item.priority === "medium" ? "#FFF4E5" : "#E5F4FF" }
+          ]}>
+            <Text style={[
+              styles.priorityText,
+              { color: item.priority === "high" ? "#FF5252" : item.priority === "medium" ? "#FF8C00" : "#2196F3" }
+            ]}>
+              {item.priority?.toUpperCase()}
+            </Text>
+          </View>
+        </View>
+      </View>
 
       <TouchableOpacity
         style={styles.deleteButtonContainer}
         onPress={() => deleteTask(item.id)}
         activeOpacity={0.7}
       >
-        <Ionicons name="trash-outline" size={22} color="#FF6347" />
+        <Ionicons name="trash-outline" size={22} color={THEME.colors.error} />
       </TouchableOpacity>
     </View>
   );
@@ -199,23 +215,47 @@ export default function TasksScreen() {
         </View>
 
         {/* Input Section */}
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter a new task..."
-            placeholderTextColor="#A0A0A0"
-            value={newTaskTitle}
-            onChangeText={setNewTaskTitle}
-            onSubmitEditing={addTask}
-            returnKeyType="done"
-          />
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={addTask}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="add" size={26} color="#FFFFFF" />
-          </TouchableOpacity>
+        <View style={styles.inputCard}>
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter a new task..."
+              placeholderTextColor="#A0A0A0"
+              value={newTaskTitle}
+              onChangeText={setNewTaskTitle}
+              onSubmitEditing={addTask}
+              returnKeyType="done"
+            />
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={addTask}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="add" size={26} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.prioritySelector}>
+            <Text style={styles.selectorLabel}>Priority:</Text>
+            {(["low", "medium", "high"] as const).map((p) => (
+              <TouchableOpacity
+                key={p}
+                style={[
+                  styles.priorityOption,
+                  newTaskPriority === p && styles.priorityOptionSelected,
+                  newTaskPriority === p && { borderColor: p === "high" ? "#FF5252" : p === "medium" ? "#FF8C00" : "#2196F3" }
+                ]}
+                onPress={() => setNewTaskPriority(p)}
+              >
+                <Text style={[
+                  styles.priorityOptionText,
+                  newTaskPriority === p && { color: p === "high" ? "#FF5252" : p === "medium" ? "#FF8C00" : "#2196F3", fontWeight: "bold" }
+                ]}>
+                  {p.charAt(0).toUpperCase() + p.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         {/* Focus Mode Section */}
@@ -245,7 +285,11 @@ export default function TasksScreen() {
         {/* Task List Section */}
         <FlatList
           ref={flatListRef}
-          data={tasks}
+          data={[...tasks].sort((a, b) => {
+            if (a.completed !== b.completed) return a.completed ? 1 : -1;
+            const pMap = { high: 0, medium: 1, low: 2 };
+            return pMap[a.priority || "medium"] - pMap[b.priority || "medium"];
+          })}
           keyExtractor={(item) => item.id}
           renderItem={renderTask}
           contentContainerStyle={styles.listContainer}
@@ -265,7 +309,7 @@ export default function TasksScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F5F7FB",
+    backgroundColor: THEME.colors.background,
   },
   container: {
     flex: 1,
@@ -273,53 +317,87 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
   header: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   title: {
     fontSize: 32,
     fontWeight: "800",
-    color: "#1A1A1A",
+    color: THEME.colors.text,
   },
   subtitle: {
     fontSize: 16,
-    color: "#666666",
+    color: THEME.colors.textLight,
     marginTop: 4,
   },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
+  inputCard: {
+    backgroundColor: THEME.colors.white,
+    borderRadius: 20,
+    padding: 16,
     marginBottom: 24,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-    height: 54,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    color: "#1A1A1A",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
-    marginRight: 12,
+  },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  input: {
+    flex: 1,
+    backgroundColor: "#F9FAFC",
+    height: 50,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    color: THEME.colors.text,
+    borderWidth: 1,
+    borderColor: "#EEEEEE",
+    marginRight: 10,
   },
   addButton: {
-    width: 54,
-    height: 54,
-    backgroundColor: "#6C63FF",
-    borderRadius: 16,
+    width: 50,
+    height: 50,
+    backgroundColor: THEME.colors.primary,
+    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#6C63FF",
+    shadowColor: THEME.colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
   },
-  focusContainer: {
+  prioritySelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  selectorLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: THEME.colors.textLight,
+    marginRight: 10,
+  },
+  priorityOption: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "transparent",
+    backgroundColor: "#F5F7FB",
+  },
+  priorityOptionSelected: {
     backgroundColor: "#FFFFFF",
+  },
+  priorityOptionText: {
+    fontSize: 12,
+    color: THEME.colors.textLight,
+  },
+  focusContainer: {
+    backgroundColor: THEME.colors.white,
     borderRadius: 16,
     padding: 20,
     marginBottom: 24,
@@ -333,13 +411,13 @@ const styles = StyleSheet.create({
   focusTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#1A1A1A",
+    color: THEME.colors.text,
     marginBottom: 12,
   },
   focusTimer: {
     fontSize: 48,
     fontWeight: "800",
-    color: "#6C63FF",
+    color: THEME.colors.primary,
     marginBottom: 20,
     fontVariant: ["tabular-nums"],
   },
@@ -356,7 +434,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   focusButtonStart: {
-    backgroundColor: "#6C63FF",
+    backgroundColor: THEME.colors.primary,
   },
   focusButtonPause: {
     backgroundColor: "#FF9F43",
@@ -371,7 +449,7 @@ const styles = StyleSheet.create({
   },
   focusSessionsText: {
     fontSize: 14,
-    color: "#666666",
+    color: THEME.colors.textLight,
     fontWeight: "500",
   },
   listContainer: {
@@ -381,7 +459,7 @@ const styles = StyleSheet.create({
   taskCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: THEME.colors.white,
     padding: 16,
     borderRadius: 16,
     marginBottom: 12,
@@ -395,14 +473,26 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   taskTitle: {
-    flex: 1,
     fontSize: 16,
-    color: "#1A1A1A",
-    fontWeight: "500",
+    color: THEME.colors.text,
+    fontWeight: "600",
   },
   taskTitleCompleted: {
     color: "#A0A0A0",
     textDecorationLine: "line-through",
+  },
+  taskFooter: {
+    marginTop: 6,
+    flexDirection: "row",
+  },
+  priorityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  priorityText: {
+    fontSize: 10,
+    fontWeight: "800",
   },
   deleteButtonContainer: {
     paddingLeft: 12,

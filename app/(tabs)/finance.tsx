@@ -1,6 +1,7 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Picker } from '@react-native-picker/picker';
-import React, { useEffect, useMemo, useState } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Picker } from "@react-native-picker/picker";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Dimensions,
@@ -10,30 +11,20 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { PieChart } from 'react-native-chart-kit';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+} from "react-native";
+import { PieChart } from "react-native-chart-kit";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { STORAGE_KEYS, THEME, Transaction } from "../../constants/types";
 
-interface Transaction {
-  id: string;
-  amount: number;
-  category: string;
-  type: 'income' | 'expense';
-  date: string;
-}
-
-const STORAGE_KEY = 'FINANCE_STORAGE';
-const screenWidth = Dimensions.get('window').width;
-
-const EXPENSE_CATEGORIES = ['Food', 'Transport', 'Bills', 'Shopping', 'Other'];
-const INCOME_CATEGORIES = ['Salary', 'Freelance', 'Investments', 'Gift', 'Other'];
+const screenWidth = Dimensions.get("window").width;
+const EXPENSE_CATEGORIES = ["Food", "Transport", "Bills", "Shopping", "Other"];
+const INCOME_CATEGORIES = ["Salary", "Freelance", "Investments", "Gift", "Other"];
 
 export default function FinanceScreen() {
   const insets = useSafeAreaInsets();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [amount, setAmount] = useState('');
-  const [type, setType] = useState<'income' | 'expense'>('expense');
-  // Initialize category to the first relevant option based on default type
+  const [amount, setAmount] = useState("");
+  const [type, setType] = useState<"income" | "expense">("expense");
   const [category, setCategory] = useState(EXPENSE_CATEGORIES[0]);
 
   useEffect(() => {
@@ -41,490 +32,158 @@ export default function FinanceScreen() {
   }, []);
 
   const loadTransactions = async () => {
-    try {
-      const saved = await AsyncStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        setTransactions(JSON.parse(saved));
-      }
-    } catch (error) {
-      console.error('Failed to load transactions:', error);
-    }
+    const saved = await AsyncStorage.getItem(STORAGE_KEYS.FINANCE);
+    if (saved) setTransactions(JSON.parse(saved));
   };
 
-  const saveTransactions = async (newTransactions: Transaction[]) => {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newTransactions));
-    } catch (error) {
-      console.error('Failed to save transactions:', error);
-    }
-  };
-
-  const handleAddTransaction = () => {
-    if (!amount) {
-      Alert.alert('Error', 'Please enter an amount');
-      return;
-    }
-
-    const parsedAmount = parseFloat(amount);
-    if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      Alert.alert('Error', 'Please enter a valid amount');
-      return;
-    }
-
-    const newTransaction: Transaction = {
+  const handleAddTransaction = async () => {
+    if (!amount || isNaN(parseFloat(amount))) return Alert.alert("Invalid Amount");
+    const newTx: Transaction = {
       id: Date.now().toString(),
-      amount: parsedAmount,
-      category: category.trim(),
+      amount: parseFloat(amount),
+      category,
       type,
       date: new Date().toISOString(),
     };
-
-    const updatedTransactions = [newTransaction, ...transactions];
-    setTransactions(updatedTransactions);
-    saveTransactions(updatedTransactions);
-
-    // Reset form
-    setAmount('');
-    setCategory(type === 'income' ? INCOME_CATEGORIES[0] : EXPENSE_CATEGORIES[0]);
+    const updated = [newTx, ...transactions];
+    setTransactions(updated);
+    await AsyncStorage.setItem(STORAGE_KEYS.FINANCE, JSON.stringify(updated));
+    setAmount("");
   };
 
-  const handleDeleteTransaction = (id: string) => {
-    const updatedTransactions = transactions.filter((t) => t.id !== id);
-    setTransactions(updatedTransactions);
-    saveTransactions(updatedTransactions);
-  };
-
-  const calculateTotals = () => {
-    let income = 0;
-    let expense = 0;
-
-    transactions.forEach((t) => {
-      if (t.type === 'income') {
-        income += t.amount;
-      } else {
-        expense += t.amount;
-      }
-    });
-
-    return { income, expense, savings: income - expense };
-  };
-
-  const totals = calculateTotals();
-
-  const chartData = useMemo(() => {
-    const expenseCategories: { [key: string]: number } = {};
-
-    transactions.forEach((t) => {
-      if (t.type === 'expense') {
-        expenseCategories[t.category] = (expenseCategories[t.category] || 0) + t.amount;
-      }
-    });
-
-    const colors = [
-      '#FF6384',
-      '#36A2EB',
-      '#FFCE56',
-      '#4BC0C0',
-      '#9966FF',
-      '#FF9F40',
-      '#8AC926',
-      '#1982C4',
-      '#6A4C93'
-    ];
-
-    return Object.keys(expenseCategories)
-      .map((category, index) => ({
-        name: category,
-        amount: expenseCategories[category],
-        color: colors[index % colors.length],
-        legendFontColor: '#555',
-        legendFontSize: 13,
-      }))
-      .sort((a, b) => b.amount - a.amount);
+  const totals = useMemo(() => {
+    return transactions.reduce((acc, t) => {
+      if (t.type === "income") acc.income += t.amount;
+      else acc.expense += t.amount;
+      acc.savings = acc.income - acc.expense;
+      return acc;
+    }, { income: 0, expense: 0, savings: 0 });
   }, [transactions]);
 
-  const renderTransaction = ({ item }: { item: Transaction }) => (
-    <View style={styles.transactionCard}>
-      <View style={styles.transactionInfo}>
-        <Text style={styles.transactionCategory}>{item.category}</Text>
-        <Text style={styles.transactionTypeHint}>
-          {item.type === 'income' ? 'Income' : 'Expense'}
-        </Text>
-      </View>
-      <View style={styles.transactionRight}>
-        <Text
-          style={[
-            styles.transactionAmount,
-            { color: item.type === 'income' ? '#2ecc71' : '#e74c3c' },
-          ]}
-        >
-          {item.type === 'income' ? '+' : '-'}₹{item.amount.toLocaleString('en-IN')}
-        </Text>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => handleDeleteTransaction(item.id)}
-        >
-          <Text style={styles.deleteButtonText}>Delete</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+  const chartData = useMemo(() => {
+    const categories: Record<string, number> = {};
+    transactions.filter(t => t.type === "expense").forEach(t => {
+      categories[t.category] = (categories[t.category] || 0) + t.amount;
+    });
+    const colors = ["#6C63FF", "#FF8C00", "#00C9A7", "#FF5252", "#4A90E2"];
+    return Object.keys(categories).map((cat, i) => ({
+      name: cat,
+      amount: categories[cat],
+      color: colors[i % colors.length],
+      legendFontColor: THEME.colors.textLight,
+      legendFontSize: 12,
+    }));
+  }, [transactions]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <FlatList
         data={transactions}
-        keyExtractor={(item) => item.id}
-        renderItem={renderTransaction}
-        contentContainerStyle={styles.listContent}
+        keyExtractor={t => t.id}
+        renderItem={({ item }) => (
+          <View style={styles.txCard}>
+            <View style={[styles.txIcon, { backgroundColor: item.type === "income" ? "#DCFCE7" : "#FEE2E2" }]}>
+              <Ionicons name={item.type === "income" ? "arrow-down" : "arrow-up"} size={20} color={item.type === "income" ? "#16A34A" : "#EF4444"} />
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.txTitle}>{item.category}</Text>
+              <Text style={styles.txDate}>{new Date(item.date).toLocaleDateString()}</Text>
+            </View>
+            <Text style={[styles.txAmount, { color: item.type === "income" ? "#16A34A" : "#EF4444" }]}>
+              {item.type === "income" ? "+" : "-"}₹{item.amount.toLocaleString()}
+            </Text>
+          </View>
+        )}
         ListHeaderComponent={
           <>
-            {/* Header */}
-            <View style={styles.header}>
-              <Text style={styles.title}>Finance</Text>
-              <Text style={styles.subtitle}>Track your income and expenses</Text>
+            <Text style={styles.title}>Finance</Text>
+
+            <View style={styles.summaryRow}>
+              <SummaryItem label="Income" value={totals.income} color="#16A34A" />
+              <SummaryItem label="Expense" value={totals.expense} color="#EF4444" />
+              <SummaryItem label="Savings" value={totals.savings} color={THEME.colors.primary} />
             </View>
 
-            {/* Summary Cards */}
-            <View style={styles.summaryContainer}>
-              <View style={[styles.summaryCard, styles.incomeCard]}>
-                <Text style={styles.summaryLabel}>Income</Text>
-                <Text style={styles.summaryValue}>₹{totals.income.toLocaleString('en-IN')}</Text>
-              </View>
-              <View style={[styles.summaryCard, styles.expenseCard]}>
-                <Text style={styles.summaryLabel}>Expenses</Text>
-                <Text style={styles.summaryValue}>₹{totals.expense.toLocaleString('en-IN')}</Text>
-              </View>
-              <View style={[styles.summaryCard, styles.savingsCard]}>
-                <Text style={styles.summaryLabel}>Savings</Text>
-                <Text style={styles.summaryValue}>₹{totals.savings.toLocaleString('en-IN')}</Text>
-              </View>
-            </View>
-
-            {/* Chart Section */}
             {chartData.length > 0 && (
-              <View style={styles.chartSection}>
-                <Text style={styles.sectionTitle}>Expense Breakdown</Text>
+              <View style={styles.chartCard}>
+                <Text style={styles.cardTitle}>Expense Breakdown</Text>
                 <PieChart
                   data={chartData}
-                  width={screenWidth - 40}
-                  height={220}
-                  chartConfig={{
-                    color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                  }}
+                  width={screenWidth - 72}
+                  height={180}
+                  chartConfig={{ color: (o = 1) => `rgba(0,0,0,${o})` }}
                   accessor="amount"
                   backgroundColor="transparent"
                   paddingLeft="15"
                   center={[10, 0]}
-                  absolute={false}
                 />
               </View>
             )}
 
-            {/* Add Transaction Section */}
-            <View style={styles.addSection}>
-              <View style={styles.typeSelector}>
-                <TouchableOpacity
-                  style={[
-                    styles.typeOption,
-                    type === 'expense' && styles.typeOptionActiveError,
-                  ]}
-                  onPress={() => {
-                    setType('expense');
-                    setCategory(EXPENSE_CATEGORIES[0]);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.typeText,
-                      type === 'expense' && styles.typeTextActive,
-                    ]}
-                  >
-                    Expense
-                  </Text>
+            <View style={styles.addCard}>
+              <View style={styles.typeToggle}>
+                <TouchableOpacity onPress={() => { setType("expense"); setCategory(EXPENSE_CATEGORIES[0]); }} style={[styles.toggleBtn, type === "expense" && styles.toggleActiveExp]}>
+                  <Text style={[styles.toggleText, type === "expense" && styles.textWhite]}>Expense</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.typeOption,
-                    type === 'income' && styles.typeOptionActiveSuccess,
-                  ]}
-                  onPress={() => {
-                    setType('income');
-                    setCategory(INCOME_CATEGORIES[0]);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.typeText,
-                      type === 'income' && styles.typeTextActive,
-                    ]}
-                  >
-                    Income
-                  </Text>
+                <TouchableOpacity onPress={() => { setType("income"); setCategory(INCOME_CATEGORIES[0]); }} style={[styles.toggleBtn, type === "income" && styles.toggleActiveInc]}>
+                  <Text style={[styles.toggleText, type === "income" && styles.textWhite]}>Income</Text>
                 </TouchableOpacity>
               </View>
-
-              <TextInput
-                style={styles.input}
-                placeholder="Amount"
-                placeholderTextColor="#999"
-                keyboardType="numeric"
-                value={amount}
-                onChangeText={setAmount}
-              />
-
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={category}
-                  onValueChange={(itemValue) => setCategory(itemValue)}
-                  style={styles.picker}
-                  dropdownIconColor="#666"
-                >
-                  {(type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map((cat) => (
-                    <Picker.Item key={cat} label={cat} value={cat} color="#333" />
-                  ))}
+              <TextInput style={styles.input} placeholder="Amount" keyboardType="numeric" value={amount} onChangeText={setAmount} />
+              <View style={styles.pickerWrap}>
+                <Picker selectedValue={category} onValueChange={setCategory} style={styles.picker}>
+                  {(type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map(c => <Picker.Item key={c} label={c} value={c} />)}
                 </Picker>
               </View>
-
-              <TouchableOpacity style={styles.addButton} onPress={handleAddTransaction}>
-                <Text style={styles.addButtonText}>Add Transaction</Text>
+              <TouchableOpacity style={styles.addBtn} onPress={handleAddTransaction}>
+                <Text style={styles.addBtnText}>Add Transaction</Text>
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.listSectionTitle}>Transactions</Text>
+            <Text style={styles.sectionTitle}>Recent Transactions</Text>
           </>
         }
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>
-              No transactions yet. Add one above.
-            </Text>
-          </View>
-        }
+        contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+        showsVerticalScrollIndicator={false}
       />
     </View>
   );
 }
 
+function SummaryItem({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <View style={styles.summaryItem}>
+      <Text style={styles.summaryLabel}>{label}</Text>
+      <Text style={[styles.summaryVal, { color }]}>₹{Math.abs(value).toLocaleString()}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F7FB',
-  },
-  header: {
-    paddingVertical: 20,
-    backgroundColor: '#F5F7FB',
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 4,
-  },
-  listContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  summaryContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  summaryCard: {
-    flex: 1,
-    padding: 15,
-    borderRadius: 12,
-    marginHorizontal: 4,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  incomeCard: {
-    backgroundColor: '#e8f5e9',
-    borderWidth: 1,
-    borderColor: '#c8e6c9',
-  },
-  expenseCard: {
-    backgroundColor: '#ffebee',
-    borderWidth: 1,
-    borderColor: '#ffcdd2',
-  },
-  savingsCard: {
-    backgroundColor: '#f3e5f5',
-    borderWidth: 1,
-    borderColor: '#e1bee7',
-  },
-  summaryLabel: {
-    fontSize: 12,
-    color: '#555',
-    marginBottom: 4,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  summaryValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  chartSection: {
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 20,
-    borderRadius: 16,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    alignItems: 'center',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 16,
-    alignSelf: 'flex-start',
-    marginLeft: 20,
-  },
-  addSection: {
-    backgroundColor: '#FFFFFF',
-    padding: 20,
-    borderRadius: 16,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  typeSelector: {
-    flexDirection: 'row',
-    marginBottom: 16,
-    backgroundColor: '#F5F7FB',
-    borderRadius: 8,
-    padding: 4,
-  },
-  typeOption: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 6,
-  },
-  typeOptionActiveError: {
-    backgroundColor: '#e74c3c',
-  },
-  typeOptionActiveSuccess: {
-    backgroundColor: '#2ecc71',
-  },
-  typeText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-  },
-  typeTextActive: {
-    color: '#FFF',
-  },
-  input: {
-    backgroundColor: '#F5F7FB',
-    borderRadius: 8,
-    padding: 14,
-    marginBottom: 12,
-    fontSize: 16,
-    color: '#333',
-  },
-  pickerContainer: {
-    backgroundColor: '#F5F7FB',
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  picker: {
-    height: 50,
-    width: '100%',
-  },
-  addButton: {
-    backgroundColor: '#6C63FF',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  addButtonText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  listSectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
-  },
-  transactionCard: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  transactionInfo: {
-    flex: 1,
-  },
-  transactionCategory: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-  transactionTypeHint: {
-    fontSize: 12,
-    color: '#888',
-  },
-  transactionRight: {
-    alignItems: 'flex-end',
-  },
-  transactionAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  deleteButton: {
-    backgroundColor: '#ffebee',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 4,
-  },
-  deleteButtonText: {
-    color: '#e74c3c',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  emptyState: {
-    padding: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderStyle: 'dashed',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-  },
-  emptyStateText: {
-    color: '#888',
-    fontSize: 16,
-    textAlign: 'center',
-  },
+  container: { flex: 1, backgroundColor: THEME.colors.background },
+  title: { fontSize: 32, fontWeight: "800", color: THEME.colors.text, marginBottom: 20 },
+  summaryRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 24 },
+  summaryItem: { backgroundColor: "#FFF", width: "31%", padding: 12, borderRadius: 16, alignItems: "center", shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 10, elevation: 2 },
+  summaryLabel: { fontSize: 11, fontWeight: "700", color: THEME.colors.textLight, textTransform: "uppercase", marginBottom: 4 },
+  summaryVal: { fontSize: 14, fontWeight: "900" },
+  chartCard: { backgroundColor: "#FFF", borderRadius: 24, padding: 16, marginBottom: 24, alignItems: "center" },
+  cardTitle: { fontSize: 16, fontWeight: "700", color: THEME.colors.text, alignSelf: "flex-start", marginLeft: 8, marginBottom: 8 },
+  addCard: { backgroundColor: "#FFF", borderRadius: 24, padding: 20, marginBottom: 24 },
+  typeToggle: { flexDirection: "row", backgroundColor: "#F3F4F6", borderRadius: 12, padding: 4, marginBottom: 16 },
+  toggleBtn: { flex: 1, paddingVertical: 10, alignItems: "center", borderRadius: 8 },
+  toggleActiveExp: { backgroundColor: "#EF4444" },
+  toggleActiveInc: { backgroundColor: "#16A34A" },
+  toggleText: { fontWeight: "700", color: THEME.colors.textLight },
+  textWhite: { color: "#FFF" },
+  input: { backgroundColor: "#F9FAFB", borderRadius: 12, padding: 14, fontSize: 16, marginBottom: 12, borderWidth: 1, borderColor: "#F3F4F6" },
+  pickerWrap: { backgroundColor: "#F9FAFB", borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: "#F3F4F6", overflow: "hidden" },
+  picker: { height: 50 },
+  addBtn: { backgroundColor: THEME.colors.primary, borderRadius: 12, padding: 16, alignItems: "center" },
+  addBtnText: { color: "#FFF", fontWeight: "700", fontSize: 16 },
+  sectionTitle: { fontSize: 18, fontWeight: "700", color: THEME.colors.text, marginBottom: 16 },
+  txCard: { backgroundColor: "#FFF", borderRadius: 16, padding: 12, flexDirection: "row", alignItems: "center", marginBottom: 10 },
+  txIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: "center", alignItems: "center" },
+  txTitle: { fontSize: 15, fontWeight: "700", color: THEME.colors.text },
+  txDate: { fontSize: 12, color: THEME.colors.textLight },
+  txAmount: { fontSize: 16, fontWeight: "800" },
 });

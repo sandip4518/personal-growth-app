@@ -1,7 +1,7 @@
-import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -9,245 +9,60 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
-} from 'react-native';
-import { BarChart } from 'react-native-chart-kit';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+  View,
+} from "react-native";
+import { BarChart } from "react-native-chart-kit";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { STORAGE_KEYS, THEME } from "../../constants/types";
+import { useGrowthData } from "../../hooks/useGrowthData";
 
-const screenWidth = Dimensions.get('window').width;
-
-const HABITS_STORAGE_KEY = 'HABITS_STORAGE';
-const TASK_STORAGE_KEY = 'tasks_storage';
-const FINANCE_STORAGE_KEY = 'FINANCE_STORAGE';
-const GOALS_STORAGE = 'GOALS_STORAGE';
-const LIFE_BALANCE_STORAGE = 'LIFE_BALANCE_STORAGE';
-const TARGET_SAVINGS = 100000;
-
-interface Goal {
-  id: string;
-  title: string;
-  type: "habit" | "task" | "finance" | "custom";
-  targetValue: number;
-  currentValue: number;
-  deadline: string;
-  completed: boolean;
-  subgoals?: any[];
-}
-
-const QUOTES = [
-  "You are becoming better every day.",
-  "Small steps every day lead to big results.",
-  "Consistency is what transforms average into excellence.",
-  "Your future is created by what you do today.",
-  "Focus on the step in front of you, not the whole staircase.",
-];
+const screenWidth = Dimensions.get("window").width;
 
 export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [isLoading, setIsLoading] = useState(true);
-  const [userData, setUserData] = useState<{ name: string; email: string } | null>(null);
+  const { loading, data, metrics, refresh } = useGrowthData();
 
-  // Stats State
-  const [totalTasks, setTotalTasks] = useState(0);
-  const [completedTasks, setCompletedTasks] = useState(0);
-  const [totalHabits, setTotalHabits] = useState(0);
-  const [highestStreak, setHighestStreak] = useState(0);
-  const [savings, setSavings] = useState(0);
-  const [weeklyData, setWeeklyData] = useState(Array(7).fill(0));
-  const [completedGoals, setCompletedGoals] = useState(0);
-  const [activeGoalsCount, setActiveGoalsCount] = useState(0);
-  const [activeGoalsList, setActiveGoalsList] = useState<Goal[]>([]);
-
-  // Life Balance State
   const [lifeBalance, setLifeBalance] = useState<Record<string, number>>({
     Health: 5, Career: 5, Finance: 5, Learning: 5, Relationships: 5, Mindset: 5, Fun: 5
   });
 
-  const [quote] = useState(QUOTES[Math.floor(Math.random() * QUOTES.length)]);
-
-  useFocusEffect(
-    useCallback(() => {
-      checkLoginStatus();
-    }, [])
-  );
-
-  const checkLoginStatus = async () => {
-    setIsLoading(true);
-    try {
-      const isLoggedIn = await AsyncStorage.getItem('USER_LOGGED_IN');
-      if (isLoggedIn === 'true') {
-        const data = await AsyncStorage.getItem('USER_DATA');
-        if (data) {
-          setUserData(JSON.parse(data));
-        }
-        await loadDashboardData();
-        setIsLoading(false);
-      } else {
-        router.replace('/auth/login');
-      }
-    } catch (error) {
-      console.error('Failed to check login status', error);
-      router.replace('/auth/login');
-    }
-  };
-
-  const loadDashboardData = async () => {
-    try {
-      // Load Tasks
-      const storedTasks = await AsyncStorage.getItem(TASK_STORAGE_KEY);
-      let tasks = [];
-      if (storedTasks) {
-        tasks = JSON.parse(storedTasks);
-        setTotalTasks(tasks.length);
-        setCompletedTasks(tasks.filter((t: any) => t.completed).length);
-      }
-
-      // Load Habits
-      const storedHabits = await AsyncStorage.getItem(HABITS_STORAGE_KEY);
-      let activeHabits = [];
-      if (storedHabits) {
-        const habits = JSON.parse(storedHabits);
-        activeHabits = habits;
-        setTotalHabits(habits.length);
-
-        let maxStreak = 0;
-        let weekCounts = Array(7).fill(0);
-
-        const now = new Date();
-        const startOfWeek = new Date(now);
-        // Start of week (Monday)
-        const day = now.getDay();
-        const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-        startOfWeek.setDate(diff);
-        startOfWeek.setHours(0, 0, 0, 0);
-
-        habits.forEach((h: any) => {
-          if (h.streak > maxStreak) maxStreak = h.streak;
-
-          h.completedDates?.forEach((dateStr: string) => {
-            const d = new Date(dateStr);
-            if (d >= startOfWeek) {
-              // 0-6 index for Mon-Sun
-              let dayIdx = d.getDay() - 1;
-              if (dayIdx === -1) dayIdx = 6;
-              weekCounts[dayIdx]++;
-            }
-          });
-        });
-        setHighestStreak(maxStreak);
-        setWeeklyData(weekCounts);
-      }
-
-      // Load Finances
-      const storedFinance = await AsyncStorage.getItem(FINANCE_STORAGE_KEY);
-      if (storedFinance) {
-        const transactions = JSON.parse(storedFinance);
-        let totalIncome = 0;
-        let totalExpense = 0;
-        transactions.forEach((t: any) => {
-          if (t.type === 'income') totalIncome += t.amount;
-          else totalExpense += t.amount;
-        });
-        setSavings(Math.max(0, totalIncome - totalExpense));
-      }
-
-      // Load Goals
-      const storedGoals = await AsyncStorage.getItem(GOALS_STORAGE);
-      if (storedGoals) {
-        const goals = JSON.parse(storedGoals);
-        setCompletedGoals(goals.filter((g: any) => g.completed).length);
-        const active = goals.filter((g: any) => {
-          if (g.type === "custom" && g.subgoals && g.subgoals.length > 0) {
-            return g.currentValue < g.targetValue;
-          }
-          return !g.completed && g.currentValue < g.targetValue;
-        });
-        setActiveGoalsCount(active.length);
-        setActiveGoalsList(active.slice(0, 3)); // Show top 3 active goals
-      }
-
-      // Load Life Balance
-      const storedBalance = await AsyncStorage.getItem(LIFE_BALANCE_STORAGE);
-      if (storedBalance) {
-        setLifeBalance(JSON.parse(storedBalance));
-      }
-
-    } catch (error) {
-      console.error('Failed to load dashboard data:', error);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await AsyncStorage.removeItem('USER_LOGGED_IN');
-      router.replace('/auth/login');
-    } catch (error) {
-      console.error('Failed to logout', error);
-    }
-  };
+  useEffect(() => {
+    const loadLifeBalance = async () => {
+      const stored = await AsyncStorage.getItem("LIFE_BALANCE_STORAGE");
+      if (stored) setLifeBalance(JSON.parse(stored));
+    };
+    loadLifeBalance();
+  }, []);
 
   const updateLifeBalance = async (area: string, value: number) => {
     const newBalance = { ...lifeBalance, [area]: value };
     setLifeBalance(newBalance);
-    await AsyncStorage.setItem(LIFE_BALANCE_STORAGE, JSON.stringify(newBalance));
+    await AsyncStorage.setItem("LIFE_BALANCE_STORAGE", JSON.stringify(newBalance));
   };
 
-  // Calculations
-  const productivityScore = Math.min(100, Math.round(((completedTasks + (highestStreak * 2)) / Math.max(1, (totalTasks + totalHabits))) * 100)) || 0;
-  const savingsProgress = Math.min(100, (savings / TARGET_SAVINGS) * 100);
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem(STORAGE_KEYS.LOGGED_IN);
+      router.replace("/auth/login");
+    } catch (e) {
+      console.error("Logout failed", e);
+    }
+  };
 
-  const balanceValues = Object.values(lifeBalance);
-  const averageBalance = (balanceValues.reduce((a, b) => a + b, 0) / balanceValues.length).toFixed(1);
-
-  // Badges Logic
-  // 1. Streak Badge Logic (Tiers: 3, 7, 14, 30, 60, 100 days)
-  let streakBadgeDays = 7;
-  let hasStreakBadge = false;
-
-  if (highestStreak >= 100) { streakBadgeDays = 100; hasStreakBadge = true; }
-  else if (highestStreak >= 60) { streakBadgeDays = 60; hasStreakBadge = true; }
-  else if (highestStreak >= 30) { streakBadgeDays = 30; hasStreakBadge = true; }
-  else if (highestStreak >= 14) { streakBadgeDays = 14; hasStreakBadge = true; }
-  else if (highestStreak >= 7) { streakBadgeDays = 7; hasStreakBadge = true; }
-  else if (highestStreak >= 3) { streakBadgeDays = 3; hasStreakBadge = true; }
-  else { streakBadgeDays = 7; hasStreakBadge = false; } // Locked base state
-
-  // 2. Tasks Completed Logic (Tiers: 1, 10, 50, 100, 500 tasks)
-  let taskBadgeCount = 10;
-  let hasTaskBadge = false;
-
-  if (completedTasks >= 500) { taskBadgeCount = 500; hasTaskBadge = true; }
-  else if (completedTasks >= 100) { taskBadgeCount = 100; hasTaskBadge = true; }
-  else if (completedTasks >= 50) { taskBadgeCount = 50; hasTaskBadge = true; }
-  else if (completedTasks >= 10) { taskBadgeCount = 10; hasTaskBadge = true; }
-  else if (completedTasks >= 1) { taskBadgeCount = 1; hasTaskBadge = true; }
-  else { taskBadgeCount = 10; hasTaskBadge = false; } // Locked base state
-
-  // 3. Savings Logic (Tiers: 1K, 10K, 50K, 100K)
-  let savingsBadgeLabel = '10K';
-  let hasSavingsBadge = false;
-
-  if (savings >= 100000) { savingsBadgeLabel = '100K'; hasSavingsBadge = true; }
-  else if (savings >= 50000) { savingsBadgeLabel = '50K'; hasSavingsBadge = true; }
-  else if (savings >= 10000) { savingsBadgeLabel = '10K'; hasSavingsBadge = true; }
-  else if (savings >= 1000) { savingsBadgeLabel = '1K'; hasSavingsBadge = true; }
-  else { savingsBadgeLabel = '10K'; hasSavingsBadge = false; } // Locked base state
-
-  // Weekly Max for chart scaling
-  const maxWeekly = Math.max(...weeklyData, 1);
-
-  if (isLoading) {
+  if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6C63FF" />
+        <ActivityIndicator size="large" color={THEME.colors.primary} />
       </View>
     );
   }
 
+  const averageBalance = (Object.values(lifeBalance).reduce((a, b) => a + b, 0) / Object.values(lifeBalance).length).toFixed(1);
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Profile Header */}
         <View style={styles.headerCard}>
           <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
@@ -258,544 +73,169 @@ export default function ProfileScreen() {
           <View style={styles.headerContent}>
             <View style={styles.avatarWrapper}>
               <View style={styles.avatarMain}>
-                <Text style={styles.avatarInitial}>
-                  {userData?.name ? userData.name.charAt(0).toUpperCase() : 'U'}
-                </Text>
+                <Text style={styles.avatarInitial}>{data.userName.charAt(0)}</Text>
               </View>
               <View style={styles.onlineBadge} />
             </View>
-
             <View style={styles.userInfo}>
-              <Text style={styles.userName}>{userData?.name || 'User'}</Text>
-              <Text style={styles.userEmail}>{userData?.email || 'user@email.com'}</Text>
+              <Text style={styles.userName}>{data.userName}</Text>
+              <Text style={styles.levelBadgeText}>{metrics?.levelTitle || "Growth Seeker"} • LVL {metrics?.level || 1}</Text>
             </View>
           </View>
         </View>
 
-        <View style={styles.content}>
-
-          {/* Quote */}
-          <View style={styles.quoteCard}>
-            <Ionicons name="sparkles" size={20} color="#6C63FF" style={styles.quoteIcon} />
-            <Text style={styles.quoteText}>"{quote}"</Text>
+        {/* Level Stats */}
+        <View style={styles.levelCard}>
+          <View style={styles.levelInfoRow}>
+            <Text style={styles.levelLabel}>Progress to Level {(metrics?.level || 1) + 1}</Text>
+            <Text style={styles.xpValue}>{metrics?.xp || 0} XP</Text>
           </View>
-
-          {/* Top Metric Cards */}
-          <View style={styles.row}>
-            {/* Productivity */}
-            <View style={[styles.card, styles.flex1, { marginRight: 8 }]}>
-              <View style={styles.cardHeaderRow}>
-                <Ionicons name="speedometer" size={20} color="#6C63FF" />
-                <Text style={styles.cardTitle}>Score</Text>
-              </View>
-              <View style={styles.numberRow}>
-                <Text style={styles.metricBig}>{productivityScore}</Text>
-                <Text style={styles.metricSub}>/100</Text>
-              </View>
-              <View style={styles.progressBarBg}>
-                <View style={[styles.progressBarFill, { width: `${productivityScore}%` }]} />
-              </View>
-            </View>
-
-            {/* Habit Streak */}
-            <View style={[styles.card, styles.flex1, { marginLeft: 8 }]}>
-              <View style={styles.cardHeaderRow}>
-                <Ionicons name="flame" size={20} color="#FF8C00" />
-                <Text style={styles.cardTitle}>Streak</Text>
-              </View>
-              <View style={styles.numberRow}>
-                <Text style={[styles.metricBig, { color: '#FF8C00' }]}>{highestStreak}</Text>
-                <Text style={styles.metricSub}>days</Text>
-              </View>
-              <Text style={styles.statLabel}>Current best streak</Text>
-            </View>
+          <View style={styles.levelBarBg}>
+            <View style={[styles.levelBarFill, { width: `${(metrics?.xp || 0) % 100}%` }]} />
           </View>
-
-          {/* Stats Overview */}
-          <View style={styles.row}>
-            <View style={[styles.card, styles.flex1]}>
-              <View style={styles.cardHeaderRow}>
-                <Ionicons name="stats-chart" size={20} color="#6C63FF" />
-                <Text style={styles.cardTitle}>Stats Overview</Text>
-              </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 10 }}>
-                <View style={{ alignItems: 'center' }}>
-                  <Text style={styles.metricBig}>{completedTasks}</Text>
-                  <Text style={styles.statLabel}>Tasks Done</Text>
-                </View>
-                <View style={{ alignItems: 'center' }}>
-                  <Text style={[styles.metricBig, { color: '#FF8C00' }]}>{totalHabits}</Text>
-                  <Text style={styles.statLabel}>Habits</Text>
-                </View>
-                <View style={{ alignItems: 'center' }}>
-                  <Text style={[styles.metricBig, { color: '#2ECC71' }]}>{completedGoals}</Text>
-                  <Text style={styles.statLabel}>Goals</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-
-          {/* Active Goals Section */}
-          <View style={styles.card}>
-            <View style={styles.cardHeaderRow}>
-              <Ionicons name="flag" size={20} color="#6C63FF" />
-              <Text style={styles.cardTitle}>Active Goals</Text>
-            </View>
-            {activeGoalsCount > 0 ? (
-              activeGoalsList.map((goal, i) => {
-                const rawProgress = (goal.currentValue / Math.max(goal.targetValue, 1)) * 100;
-                const progress = Math.min(100, Math.max(0, rawProgress));
-                const filledBlocks = Math.round(progress / 10);
-                const emptyBlocks = 10 - filledBlocks;
-                const barText = "█".repeat(filledBlocks) + "░".repeat(emptyBlocks);
-
-                return (
-                  <View key={goal.id} style={[{ marginTop: i === 0 ? 8 : 16 }]}>
-                    <Text style={{ fontSize: 16, fontWeight: "600", color: "#1A1A1A", marginBottom: 6 }}>
-                      {goal.title}
-                    </Text>
-                    <Text style={{ fontFamily: "monospace", fontSize: 13, color: "#6C63FF", letterSpacing: 1.5 }}>
-                      {barText} {progress.toFixed(0)}%
-                    </Text>
-                  </View>
-                );
-              })
-            ) : (
-              <Text style={[styles.statLabel, { marginTop: 12, fontStyle: 'italic' }]}>
-                No active goals presently. Set one up!
-              </Text>
-            )}
-          </View>
-
-          {/* Savings Goal */}
-          <View style={styles.card}>
-            <View style={styles.cardHeaderRow}>
-              <Ionicons name="wallet" size={20} color="#2ECC71" />
-              <Text style={styles.cardTitle}>Savings Goal</Text>
-            </View>
-            <View style={styles.numberRow}>
-              <Text style={[styles.metricBig, { color: '#2ECC71' }]}>₹{savings.toLocaleString('en-IN')}</Text>
-              <Text style={styles.metricSub}> / ₹1,00,000</Text>
-            </View>
-            <View style={styles.progressBarBg}>
-              <View style={[styles.progressBarFill, { backgroundColor: '#2ECC71', width: `${savingsProgress}%` }]} />
-            </View>
-          </View>
-
-          {/* Weekly Activity */}
-          <View style={styles.card}>
-            <View style={styles.cardHeaderRow}>
-              <Ionicons name="bar-chart" size={20} color="#6C63FF" />
-              <Text style={styles.cardTitle}>Weekly Activity</Text>
-            </View>
-            <View style={styles.chartContainer}>
-              {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, ix) => {
-                const val = weeklyData[ix];
-                const heightPct = Math.max(10, (val / maxWeekly) * 100);
-                const isSelected = new Date().getDay() - 1 === ix || (new Date().getDay() === 0 && ix === 6);
-                return (
-                  <View key={ix} style={styles.barCol}>
-                    <View style={styles.barBg}>
-                      <View style={[styles.barFill, { height: `${heightPct}%`, backgroundColor: isSelected ? '#6C63FF' : '#C7C2FF' }]} />
-                    </View>
-                    <Text style={[styles.barLabel, isSelected && styles.barLabelSelected]}>{day}</Text>
-                  </View>
-                )
-              })}
-            </View>
-          </View>
-
-          {/* Life Balance Tracker */}
-          <View style={styles.card}>
-            <View style={styles.cardHeaderRow}>
-              <Ionicons name="pie-chart" size={20} color="#4A90E2" />
-              <Text style={styles.cardTitle}>Life Balance</Text>
-            </View>
-            <View style={styles.numberRow}>
-              <Text style={[styles.metricBig, { color: '#4A90E2' }]}>{averageBalance}</Text>
-              <Text style={styles.metricSub}>/ 10 Score</Text>
-            </View>
-
-            {/* Bar Chart Visualization */}
-            <BarChart
-              data={{
-                labels: ["Health", "Career", "Finance", "Learn", "Relat.", "Mind.", "Fun"],
-                datasets: [{ data: Object.values(lifeBalance) }]
-              }}
-              width={screenWidth - 90}
-              height={220}
-              yAxisLabel=""
-              yAxisSuffix=""
-              fromZero
-              chartConfig={{
-                backgroundColor: "#FFFFFF",
-                backgroundGradientFrom: "#FFFFFF",
-                backgroundGradientTo: "#FFFFFF",
-                decimalPlaces: 0,
-                color: (opacity = 1) => `rgba(74, 144, 226, ${opacity})`,
-                labelColor: (opacity = 1) => `rgba(136, 136, 136, ${opacity})`,
-                style: { borderRadius: 16 },
-                propsForBackgroundLines: { strokeDasharray: "" },
-                barPercentage: 0.7, // Denser bars
-              }}
-              style={{
-                marginVertical: 16,
-                borderRadius: 16,
-                paddingRight: 35, // Balanced padding
-                alignSelf: 'center', // Center it horizontally
-              }}
-              verticalLabelRotation={0}
-            />
-
-            <View style={{ marginTop: 8 }}>
-              {Object.entries(lifeBalance).map(([area, value]) => (
-                <View key={area} style={{ marginBottom: 12 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: '#555' }} numberOfLines={1}>
-                      {area}
-                    </Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <TouchableOpacity
-                        onPress={() => updateLifeBalance(area, Math.max(1, value - 1))}
-                        style={styles.balanceBtn}
-                      >
-                        <Ionicons name="remove" size={16} color="#4A90E2" />
-                      </TouchableOpacity>
-                      <Text style={{ width: 30, textAlign: 'center', fontWeight: 'bold', color: '#4A90E2', fontSize: 15 }}>
-                        {value}
-                      </Text>
-                      <TouchableOpacity
-                        onPress={() => updateLifeBalance(area, Math.min(10, value + 1))}
-                        style={styles.balanceBtn}
-                      >
-                        <Ionicons name="add" size={16} color="#4A90E2" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-              ))}
-            </View>
-          </View>
-
-          {/* Achievements Section */}
-          <Text style={styles.sectionTitle}>Achievements</Text>
-          <View style={styles.achievementsGrid}>
-
-            <View style={[styles.badgeCard, !hasStreakBadge && styles.badgeLocked]}>
-              <Text style={styles.badgeEmoji}>🔥</Text>
-              <Text style={styles.badgeTitle}>{streakBadgeDays} Day</Text>
-              <Text style={styles.badgeSub}>Streak</Text>
-            </View>
-
-            <View style={[styles.badgeCard, !hasTaskBadge && styles.badgeLocked]}>
-              <Text style={styles.badgeEmoji}>✅</Text>
-              <Text style={styles.badgeTitle}>{taskBadgeCount} Tasks</Text>
-              <Text style={styles.badgeSub}>Completed</Text>
-            </View>
-
-            <View style={[styles.badgeCard, !hasSavingsBadge && styles.badgeLocked]}>
-              <Text style={styles.badgeEmoji}>💰</Text>
-              <Text style={styles.badgeTitle}>₹{savingsBadgeLabel}</Text>
-              <Text style={styles.badgeSub}>Saved</Text>
-            </View>
-
-            <View style={[styles.badgeCard, productivityScore < 50 && styles.badgeLocked]}>
-              <Text style={styles.badgeEmoji}>📚</Text>
-              <Text style={styles.badgeTitle}>Consistent</Text>
-              <Text style={styles.badgeSub}>Hero</Text>
-            </View>
-
-          </View>
-
-          {/* Bottom Spacing */}
-          <View style={{ height: 40 }} />
         </View>
+
+        {/* Global Stats Grid */}
+        <View style={styles.statsGrid}>
+          <View style={styles.statItem}>
+            <Text style={styles.statVal}>{data.tasks.filter(t => t.completed).length}</Text>
+            <Text style={styles.statLab}>Tasks</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={[styles.statVal, { color: '#FF8C00' }]}>{data.habits.length}</Text>
+            <Text style={styles.statLab}>Habits</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={[styles.statVal, { color: '#00C9A7' }]}>{data.goals.filter(g => g.completed).length}</Text>
+            <Text style={styles.statLab}>Goals</Text>
+          </View>
+        </View>
+
+        {/* Life Balance Chart */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Ionicons name="pie-chart-outline" size={20} color={THEME.colors.primary} />
+            <Text style={styles.cardTitle}>Life Balance Tracker</Text>
+          </View>
+          <View style={styles.avgBalanceContainer}>
+            <Text style={styles.avgBalanceVal}>{averageBalance}</Text>
+            <Text style={styles.avgBalanceLab}>Overall Balance</Text>
+          </View>
+
+          <BarChart
+            data={{
+              labels: ["Health", "Career", "Finance", "Learn", "Relat.", "Mind.", "Fun"],
+              datasets: [{ data: Object.values(lifeBalance) }]
+            }}
+            width={screenWidth - 64}
+            height={180}
+            yAxisLabel=""
+            yAxisSuffix=""
+            fromZero
+            chartConfig={{
+              backgroundColor: "#FFF",
+              backgroundGradientFrom: "#FFF",
+              backgroundGradientTo: "#FFF",
+              decimalPlaces: 0,
+              color: (opacity = 1) => `rgba(108, 99, 255, ${opacity})`,
+              labelColor: () => THEME.colors.textLight,
+              barPercentage: 0.6,
+              propsForBackgroundLines: { strokeDasharray: "" },
+            }}
+            style={styles.chartStyle}
+            verticalLabelRotation={0}
+          />
+
+          <View style={styles.balanceSelectors}>
+            {Object.entries(lifeBalance).map(([area, value]) => (
+              <View key={area} style={styles.balanceRow}>
+                <Text style={styles.areaLabel}>{area}</Text>
+                <View style={styles.stepperContainer}>
+                  <TouchableOpacity onPress={() => updateLifeBalance(area, Math.max(1, value - 1))} style={styles.stepperBtn}>
+                    <Ionicons name="remove" size={16} color={THEME.colors.primary} />
+                  </TouchableOpacity>
+                  <Text style={styles.stepperVal}>{value}</Text>
+                  <TouchableOpacity onPress={() => updateLifeBalance(area, Math.min(10, value + 1))} style={styles.stepperBtn}>
+                    <Ionicons name="add" size={16} color={THEME.colors.primary} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Achievements */}
+        <Text style={styles.sectionTitle}>Achievements</Text>
+        <View style={styles.achievementsRow}>
+          <AchievementBadge emoji="🔥" title="Consistent" sub={`${Math.max(...data.habits.map(h => h.streak), 0)} Day Streak`} locked={Math.max(...data.habits.map(h => h.streak), 0) < 3} />
+          <AchievementBadge emoji="🏆" title="Goal Crusher" sub={`${data.goals.filter(g => g.completed).length} Goals`} locked={data.goals.filter(g => g.completed).length === 0} />
+          <AchievementBadge emoji="⚡" title="Focused" sub="Level 5+" locked={(metrics?.level || 1) < 5} />
+          <AchievementBadge emoji="✍️" title="Reflector" sub="Daily Journal" locked={data.journalEntries.length < 5} />
+        </View>
+
+        <View style={{ height: 40 }} />
       </ScrollView>
     </View>
   );
 }
 
+function AchievementBadge({ emoji, title, sub, locked }: { emoji: string; title: string; sub: string; locked: boolean }) {
+  return (
+    <View style={[styles.badgeCard, locked && styles.badgeLocked]}>
+      <Text style={styles.badgeEmoji}>{emoji}</Text>
+      <Text style={styles.badgeTitle}>{title}</Text>
+      <Text style={styles.badgeSub}>{sub}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F7FB',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5F7FB',
-  },
-  headerCard: {
-    backgroundColor: '#FFFFFF',
-    paddingTop: 60,
-    paddingBottom: 30,
-    paddingHorizontal: 24,
-    borderBottomLeftRadius: 36,
-    borderBottomRightRadius: 36,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.05,
-    shadowRadius: 20,
-    elevation: 10,
-    marginBottom: 24,
-    position: 'relative',
-  },
-  logoutBtn: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF5F5',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#FFE0E0',
-    zIndex: 10,
-  },
-  logoutBtnText: {
-    color: '#FF5252',
-    fontWeight: '700',
-    fontSize: 13,
-    marginLeft: 6,
-  },
-  headerContent: {
-    alignItems: 'center',
-  },
-  avatarWrapper: {
-    position: 'relative',
-    marginBottom: 16,
-  },
-  avatarMain: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#6C63FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 12,
-    borderWidth: 4,
-    borderColor: '#F0EFFF',
-  },
-  avatarInitial: {
-    fontSize: 42,
-    fontWeight: '900',
-    color: '#FFFFFF',
-  },
-  onlineBadge: {
-    position: 'absolute',
-    bottom: 5,
-    right: 5,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#2ECC71',
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
-  },
-  userInfo: {
-    alignItems: 'center',
-  },
-  userName: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: '#1A1A1A',
-    marginBottom: 4,
-    letterSpacing: -0.5,
-  },
-  userEmail: {
-    fontSize: 14,
-    color: '#7F8C8D',
-    fontWeight: '600',
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  quoteCard: {
-    flexDirection: 'row',
-    backgroundColor: '#E8E6FF',
-    padding: 16,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  quoteIcon: {
-    marginRight: 12,
-  },
-  quoteText: {
-    flex: 1,
-    color: '#4B42B6',
-    fontSize: 14,
-    fontWeight: '600',
-    fontStyle: 'italic',
-  },
-  row: {
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
-  flex1: {
-    flex: 1,
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    padding: 20,
-    borderRadius: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#555',
-    marginLeft: 8,
-  },
-  numberRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    marginBottom: 8,
-  },
-  metricBig: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#6C63FF',
-    lineHeight: 36,
-  },
-  metricSub: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#999',
-    marginLeft: 4,
-    marginBottom: 5,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#888',
-    marginTop: 4,
-  },
-  progressBarBg: {
-    height: 8,
-    backgroundColor: '#F0F0F0',
-    borderRadius: 4,
-    marginTop: 8,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: '#6C63FF',
-    borderRadius: 4,
-  },
-  chartContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    height: 120,
-    marginTop: 10,
-    paddingHorizontal: 10,
-  },
-  barCol: {
-    alignItems: 'center',
-    width: 30,
-  },
-  barBg: {
-    width: 14,
-    height: 90,
-    backgroundColor: '#F5F7FB',
-    borderRadius: 7,
-    justifyContent: 'flex-end',
-    overflow: 'hidden',
-  },
-  barFill: {
-    width: '100%',
-    borderRadius: 7,
-  },
-  barLabel: {
-    marginTop: 8,
-    fontSize: 12,
-    color: '#999',
-    fontWeight: '600',
-  },
-  barLabelSelected: {
-    color: '#6C63FF',
-    fontWeight: 'bold',
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 16,
-    marginTop: 8,
-  },
-  achievementsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  badgeCard: {
-    width: (screenWidth - 56) / 2, // 2 columns
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#F0F0F0',
-  },
-  badgeLocked: {
-    opacity: 0.4,
-    backgroundColor: '#F8F9FA',
-  },
-  badgeEmoji: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
-  badgeTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333',
-    textAlign: 'center',
-  },
-  badgeSub: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#888',
-    textAlign: 'center',
-    marginTop: 2,
-  },
-  balanceBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: '#F0F7FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#D0E4FF',
-  },
-  balanceBtnText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
+  container: { flex: 1, backgroundColor: THEME.colors.background },
+  scrollContent: { paddingHorizontal: 20 },
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  headerCard: { backgroundColor: "#FFF", borderRadius: 32, padding: 32, marginTop: 10, marginBottom: 20, shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.05, shadowRadius: 20, elevation: 5 },
+  logoutBtn: { position: "absolute", top: 20, right: 20, flexDirection: "row", alignItems: "center", backgroundColor: "#FFF5F5", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
+  logoutBtnText: { color: "#FF5252", fontWeight: "700", fontSize: 13, marginLeft: 4 },
+  headerContent: { alignItems: "center" },
+  avatarWrapper: { marginBottom: 16 },
+  avatarMain: { width: 80, height: 80, borderRadius: 40, backgroundColor: THEME.colors.primary, justifyContent: "center", alignItems: "center" },
+  avatarInitial: { color: "#FFF", fontSize: 32, fontWeight: "900" },
+  onlineBadge: { position: "absolute", bottom: 4, right: 4, width: 16, height: 16, borderRadius: 8, backgroundColor: "#2ECC71", borderWidth: 3, borderColor: "#FFF" },
+  userInfo: { alignItems: "center" },
+  userName: { fontSize: 24, fontWeight: "800", color: THEME.colors.text },
+  levelBadgeText: { fontSize: 13, color: THEME.colors.textLight, fontWeight: "600", marginTop: 4 },
+
+  levelCard: { backgroundColor: "#FFF", padding: 20, borderRadius: 24, marginBottom: 20 },
+  levelInfoRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
+  levelLabel: { fontSize: 14, fontWeight: "700", color: THEME.colors.text },
+  xpValue: { fontSize: 14, color: THEME.colors.primary, fontWeight: "800" },
+  levelBarBg: { height: 8, backgroundColor: "#F3F4F6", borderRadius: 4, overflow: "hidden" },
+  levelBarFill: { height: "100%", backgroundColor: THEME.colors.primary },
+
+  statsGrid: { flexDirection: "row", justifyContent: "space-between", marginBottom: 24 },
+  statItem: { backgroundColor: "#FFF", width: "30%", padding: 16, borderRadius: 20, alignItems: "center" },
+  statVal: { fontSize: 20, fontWeight: "900", color: THEME.colors.primary },
+  statLab: { fontSize: 12, color: THEME.colors.textLight, marginTop: 2, fontWeight: "600" },
+
+  card: { backgroundColor: "#FFF", padding: 20, borderRadius: 24, marginBottom: 24 },
+  cardHeader: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
+  cardTitle: { fontSize: 16, fontWeight: "700", color: THEME.colors.text, marginLeft: 8 },
+  avgBalanceContainer: { alignItems: "center", marginBottom: 20 },
+  avgBalanceVal: { fontSize: 36, fontWeight: "900", color: THEME.colors.primary },
+  avgBalanceLab: { fontSize: 12, color: THEME.colors.textLight, fontWeight: "600" },
+  chartStyle: { marginVertical: 8, borderRadius: 16 },
+  balanceSelectors: { marginTop: 10 },
+  balanceRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#F9FAFB" },
+  areaLabel: { fontSize: 14, fontWeight: "600", color: "#4B5563" },
+  stepperContainer: { flexDirection: "row", alignItems: "center" },
+  stepperBtn: { width: 28, height: 28, backgroundColor: "#F3F4F6", borderRadius: 8, justifyContent: "center", alignItems: "center" },
+  stepperVal: { width: 30, textAlign: "center", fontWeight: "800", color: THEME.colors.primary, fontSize: 15 },
+
+  sectionTitle: { fontSize: 18, fontWeight: "700", color: THEME.colors.text, marginBottom: 16 },
+  achievementsRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
+  badgeCard: { width: "47%", backgroundColor: "#FFF", padding: 16, borderRadius: 20, alignItems: "center", marginBottom: 16 },
+  badgeLocked: { opacity: 0.3 },
+  badgeEmoji: { fontSize: 28, marginBottom: 8 },
+  badgeTitle: { fontSize: 14, fontWeight: "700", color: THEME.colors.text },
+  badgeSub: { fontSize: 11, color: THEME.colors.textLight, marginTop: 2 },
 });

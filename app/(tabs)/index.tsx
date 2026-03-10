@@ -1,7 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   RefreshControl,
@@ -12,72 +11,8 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-interface Task {
-  id: string;
-  title: string;
-  completed: boolean;
-}
-
-interface Habit {
-  id: string;
-  title: string;
-  streak: number;
-  completedDates: string[];
-}
-
-interface Transaction {
-  id: string;
-  amount: number;
-  category: string;
-  type: "income" | "expense";
-  date: string;
-}
-
-interface Goal {
-  id: string;
-  title: string;
-  type: "habit" | "task" | "finance" | "custom";
-  targetValue: number;
-  currentValue: number;
-  deadline: string;
-  completed: boolean;
-  subgoals?: any[];
-}
-
-interface JournalEntry {
-  id: string;
-  date: string;
-  mood: string;
-  reflection: string;
-}
-
-const GOALS_STORAGE = "GOALS_STORAGE";
-const TASK_STORAGE_KEY = "tasks_storage";
-const HABITS_STORAGE_KEY = "HABITS_STORAGE";
-const FINANCE_STORAGE_KEY = "FINANCE_STORAGE";
-const JOURNAL_STORAGE = "JOURNAL_STORAGE";
-
-const formatDate = (date: Date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
-
-const getWeekDays = () => {
-  const currentDate = new Date();
-  const currentDay = currentDate.getDay(); // 0 is Sunday, 1 is Monday...
-  const diff = currentDay === 0 ? -6 : 1 - currentDay; // Distance to Monday
-
-  const weekDays = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(currentDate);
-    d.setDate(currentDate.getDate() + diff + i);
-    weekDays.push(d);
-  }
-  return weekDays;
-};
+import { THEME } from "../../constants/types";
+import { useGrowthData } from "../../hooks/useGrowthData";
 
 const QUOTES = [
   { text: "Small daily improvements lead to big success.", author: "Robin Sharma" },
@@ -85,698 +20,148 @@ const QUOTES = [
   { text: "Your future is created by what you do today.", author: "Robert Kiyosaki" },
   { text: "The secret to getting ahead is getting started.", author: "Mark Twain" },
   { text: "Don't watch the clock; do what it does. Keep going.", author: "Sam Levenson" },
-  { text: "The best way to predict your future is to create it.", author: "Abraham Lincoln" },
-  { text: "Focus on the step in front of you, not the whole staircase.", author: "Unknown" },
-  { text: "You don't have to be great to start, but you have to start to be great.", author: "Zig Ziglar" },
-  { text: "Success is the sum of small efforts, repeated day in and day out.", author: "Robert Collier" },
-  { text: "Believe you can and you're halfway there.", author: "Theodore Roosevelt" },
 ];
 
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-
-  const [isLoading, setIsLoading] = useState(true);
+  const { loading, data, metrics, refresh } = useGrowthData();
+  const [quote, setQuote] = useState(QUOTES[0]);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [userName, setUserName] = useState("Sandy");
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [habits, setHabits] = useState<Habit[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
-
-  const [quote, setQuote] = useState(QUOTES[0]);
-  const [isQuoteLoading, setIsQuoteLoading] = useState(false);
-
-  const loadData = async () => {
-    try {
-      const results = await Promise.all([
-        AsyncStorage.getItem(TASK_STORAGE_KEY),
-        AsyncStorage.getItem(HABITS_STORAGE_KEY),
-        AsyncStorage.getItem(FINANCE_STORAGE_KEY),
-        AsyncStorage.getItem("USER_DATA"),
-        AsyncStorage.getItem(GOALS_STORAGE),
-        AsyncStorage.getItem(JOURNAL_STORAGE),
-      ]);
-
-      const [storedTasks, storedHabits, storedFinance, storedUser, storedGoals, storedJournal] = results;
-
-      if (storedTasks) setTasks(JSON.parse(storedTasks));
-      if (storedHabits) setHabits(JSON.parse(storedHabits));
-      if (storedFinance) setTransactions(JSON.parse(storedFinance));
-      if (storedGoals) setGoals(JSON.parse(storedGoals));
-      if (storedJournal) setJournalEntries(JSON.parse(storedJournal));
-      if (storedUser) {
-        const user = JSON.parse(storedUser);
-        if (user.name) setUserName(user.name);
-      }
-    } catch (e) {
-      console.error("Failed to load dashboard data", e);
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  useFocusEffect(
-    useCallback(() => {
-      loadData();
-    }, [])
-  );
-
-  const fetchQuote = async () => {
-    setIsQuoteLoading(true);
-    // Simulate a small loading delay for UI feedback
-    setTimeout(() => {
-      const randomIndex = Math.floor(Math.random() * QUOTES.length);
-      setQuote(QUOTES[randomIndex]);
-      setIsQuoteLoading(false);
-    }, 500);
-  };
-
   useEffect(() => {
-    fetchQuote();
+    setQuote(QUOTES[Math.floor(Math.random() * QUOTES.length)]);
   }, []);
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    loadData();
-    fetchQuote();
+    await refresh();
+    setQuote(QUOTES[Math.floor(Math.random() * QUOTES.length)]);
+    setRefreshing(false);
   };
 
-  if (isLoading) {
+  if (loading && !refreshing) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6C63FF" />
+        <ActivityIndicator size="large" color={THEME.colors.primary} />
       </View>
     );
   }
 
-  // 1. SMART GREETING
   const hour = new Date().getHours();
-  const greeting =
-    hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
-
+  const greeting = hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
   const todayDateStr = new Intl.DateTimeFormat("en-GB", {
     weekday: "long",
     day: "numeric",
     month: "long",
   }).format(new Date());
 
-  // 2. DAILY PROGRESS & SCORE
-  const totalTasks = tasks.length;
-  const completedTasks = tasks.filter((t) => t.completed).length;
-  const tasksProgress = totalTasks === 0 ? 0 : completedTasks / totalTasks;
-
-  const todayStr = formatDate(new Date());
-  const totalHabits = habits.length;
-  const completedHabits = habits.filter((h) =>
-    h.completedDates?.includes(todayStr)
-  ).length;
-  const habitsProgress = totalHabits === 0 ? 0 : completedHabits / totalHabits;
-
-  let score = 0;
-  if (totalTasks === 0 && totalHabits === 0) {
-    score = 0;
-  } else if (totalTasks === 0) {
-    score = habitsProgress * 100;
-  } else if (totalHabits === 0) {
-    score = tasksProgress * 100;
-  } else {
-    score = tasksProgress * 60 + habitsProgress * 40;
-  }
-  const scoreInt = Math.round(score);
-
-  let scoreMessage = "Let's get started today!";
-  if (scoreInt >= 40 && scoreInt <= 70)
-    scoreMessage = "Good progress, keep going!";
-  if (scoreInt > 70) scoreMessage = "Amazing productivity today!";
-
-  // 3. FINANCE SNAPSHOT
-  const income = transactions
-    .filter((t) => t.type === "income")
-    .reduce((sum, t) => sum + t.amount, 0);
-  const expenses = transactions
-    .filter((t) => t.type === "expense")
-    .reduce((sum, t) => sum + t.amount, 0);
-  const savings = income - expenses;
-
-  // 4. PERSONAL GROWTH SCORE (Overall)
-  // Weights: Tasks: 25%, Habits: 25%, Goals: 25%, Finance: 15%, Journal: 10%
-
-  // Tasks (25%)
-  const taskRate = totalTasks === 0 ? 0 : completedTasks / totalTasks;
-  const taskScoreContribution = taskRate * 25;
-
-  // Habits (25%)
-  const habitRate = totalHabits === 0 ? 0 : completedHabits / totalHabits;
-  const habitScoreContribution = habitRate * 25;
-
-  // Goals (25%)
-  const totalGoalsProgress = goals.length === 0 ? 0 : goals.reduce((sum, g) => {
-    const p = (g.currentValue / Math.max(g.targetValue, 1));
-    return sum + Math.min(1, Math.max(0, p));
-  }, 0) / goals.length;
-  const goalsScoreContribution = totalGoalsProgress * 25;
-
-  // Finance/Savings (15%) - Using finance goals specifically if any, otherwise savings ratio
-  const financeGoals = goals.filter(g => g.type === 'finance');
-  let financeProgress = 0;
-  if (financeGoals.length > 0) {
-    financeProgress = financeGoals.reduce((sum, g) => sum + (g.currentValue / Math.max(g.targetValue, 1)), 0) / financeGoals.length;
-  } else {
-    financeProgress = income > 0 ? Math.min(1, savings / income) : 0;
-  }
-  const financeScoreContribution = Math.min(1, Math.max(0, financeProgress)) * 15;
-
-  // Journal (10%) - Activity for today
-  const journalTodayFormat = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-  const hasJournaledToday = journalEntries.some(e => e.date === journalTodayFormat);
-  const journalScoreContribution = hasJournaledToday ? 10 : 0;
-
-  const personalGrowthScore = Math.round(
-    taskScoreContribution +
-    habitScoreContribution +
-    goalsScoreContribution +
-    financeScoreContribution +
-    journalScoreContribution
-  );
-
-  let growthMessage = "Start building momentum today.";
-  if (personalGrowthScore >= 40 && personalGrowthScore <= 70) growthMessage = "You're making good progress.";
-  if (personalGrowthScore > 70) growthMessage = "Excellent growth!";
-
-  // 5. WEEKLY CHART (Mon-Sun)
-  const weekDays = getWeekDays();
-  const weekData = weekDays.map((date) => {
-    const dStr = formatDate(date);
-    const dayLabel = new Intl.DateTimeFormat("en-US", {
-      weekday: "short",
-    }).format(date);
-
-    const habitsDone = habits.filter((h) =>
-      h.completedDates?.includes(dStr)
-    ).length;
-    // We only accurately know today's completed tasks
-    const isToday = dStr === todayStr;
-    const tasksDone = isToday ? completedTasks : 0;
-
-    const totalDone = habitsDone + tasksDone;
-
-    return { label: dayLabel, count: totalDone };
-  });
-
-  const maxActivity = Math.max(...weekData.map((d) => d.count), 1);
-
-  // 5. STREAK
-  const maxStreak =
-    habits.length > 0 ? Math.max(...habits.map((h) => h.streak)) : 0;
-
-  // 6. ACTIVE GOALS (needed for reminders & active sections)
-  // Ensure we fix corrupted state where completed=true but currentValue < targetValue
-  const activeGoals = goals.filter((g) => {
-    if (g.type === "custom" && g.subgoals && g.subgoals.length > 0) {
-      return g.currentValue < g.targetValue;
-    }
-    return !g.completed && g.currentValue < g.targetValue;
-  }).slice(0, 2);
-
-  // --- WEEKLY SUMMARY CALCS ---
-  const weekDateStrs = weekDays.map((d) => formatDate(d));
-
-  const weeklyTasksCompleted = completedTasks; // Tasks don't have dates, using all currently completed
-
-  const weeklyHabitsCompleted = habits.reduce((sum, h) => {
-    if (!h.completedDates) return sum;
-    return sum + h.completedDates.filter((d) => weekDateStrs.includes(d)).length;
-  }, 0);
-
-  const weeklyExpenses = transactions
-    .filter((t) => t.type === "expense" && weekDateStrs.includes(t.date?.split("T")[0]))
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const weeklyIncome = transactions
-    .filter((t) => t.type === "income" && weekDateStrs.includes(t.date?.split("T")[0]))
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const weeklySavings = weeklyIncome - weeklyExpenses;
-
-  const weeklyTasksProgress = totalTasks === 0 ? 0 : weeklyTasksCompleted / totalTasks;
-  const totalPossibleWeeklyHabits = totalHabits * 7;
-  const weeklyHabitsProgress = totalPossibleWeeklyHabits === 0 ? 0 : weeklyHabitsCompleted / totalPossibleWeeklyHabits;
-
-  let weeklyScore = 0;
-  if (totalTasks === 0 && totalHabits === 0) {
-    weeklyScore = 0;
-  } else if (totalTasks === 0) {
-    weeklyScore = weeklyHabitsProgress * 100;
-  } else if (totalHabits === 0) {
-    weeklyScore = weeklyTasksProgress * 100;
-  } else {
-    weeklyScore = (weeklyTasksProgress * 60) + (weeklyHabitsProgress * 40);
-  }
-  const weeklyScoreInt = Math.round(weeklyScore);
-
-  // 7. REMINDERS
-  const uncompletedTasks = tasks.filter((t) => !t.completed);
-  const uncompletedHabits = habits.filter(
-    (h) => !h.completedDates?.includes(todayStr)
-  );
-
-  const reminders = [
-    ...uncompletedHabits.map((h) => ({
-      id: `h-${h.id}`,
-      icon: "repeat-outline",
-      text: h.title,
-      type: "Habit",
-    })),
-    ...uncompletedTasks.map((t) => ({
-      id: `t-${t.id}`,
-      icon: "checkbox-outline",
-      text: t.title,
-      type: "Task",
-    })),
-    ...activeGoals.map((g) => ({
-      id: `g-${g.id}`,
-      icon: "flag-outline",
-      text: `Goal Deadline: ${g.deadline}`,
-      type: "Goal",
-    })),
-  ].slice(0, 4); // Only show top 4 reminders
-
-  // 8. SMART INSIGHTS
-  let smartInsight = "You are building strong consistency.";
-
-  const foodExpensesWeek = transactions
-    .filter((t) => t.type === "expense" && weekDateStrs.includes(t.date?.split("T")[0]) && (t.category?.toLowerCase().includes("food") || t.category?.toLowerCase().includes("dining")))
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  if (foodExpensesWeek >= 2000) {
-    smartInsight = `You spent ₹${foodExpensesWeek.toLocaleString("en-IN")} on food this week. Consider reducing dining expenses.`;
-  } else if (totalHabits > 0 && completedHabits === 0) {
-    smartInsight = "You haven't completed any habits today.";
-  } else if (totalTasks > 0 && tasksProgress >= 0.8) {
-    smartInsight = `You completed ${Math.round(tasksProgress * 100)}% of tasks this week. Great work!`;
-  } else if (maxStreak >= 3) {
-    smartInsight = "You are building strong consistency.";
-  } else if (weeklyExpenses > 5000) {
-    smartInsight = `You spent ₹${weeklyExpenses.toLocaleString("en-IN")} this week. Keep an eye on your budget.`;
-  }
+  // Smart Insight Logic
+  const getSmartInsight = () => {
+    if (!metrics) return "Loading insights...";
+    if (metrics.personalGrowthScore > 80) return "You're in the elite 1% of growth today! Keep the momentum.";
+    if (metrics.habitsProgress === 0 && data.habits.length > 0) return "Your habits are waiting for you. Small steps count!";
+    if (metrics.tasksProgress > 0.7) return "Productivity is high! Remember to take breaks.";
+    return "Consistency is the key to transformation. You're doing great!";
+  };
 
   return (
     <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       <ScrollView
         contentContainerStyle={styles.container}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#6C63FF"
-          />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={THEME.colors.primary} />}
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>
-              {greeting} {userName} 👋
-            </Text>
+            <Text style={styles.greeting}>{greeting}, {data.userName} 👋</Text>
             <Text style={styles.date}>{todayDateStr}</Text>
           </View>
-          <TouchableOpacity
-            style={styles.notificationBtn}
-            onPress={() => router.push("/notifications")}
-          >
-            <Ionicons name="notifications-outline" size={24} color="#1A1A1A" />
-            <View style={styles.notificationBadge} />
+          <TouchableOpacity style={styles.levelBadge} onPress={() => router.push("/profile")}>
+            <Text style={styles.levelText}>LVL {metrics?.level || 1}</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Quote Card */}
+        {/* Level Progress Bar (Premium Touch) */}
+        <View style={styles.levelProgressContainer}>
+          <View style={styles.levelInfoRow}>
+            <Text style={styles.levelTitle}>{metrics?.levelTitle || "Growth Seeker"}</Text>
+            <Text style={styles.xpText}>{metrics?.xp || 0} XP</Text>
+          </View>
+          <View style={styles.levelBarBg}>
+            <View style={[styles.levelBarFill, { width: `${(metrics?.xp || 0) % 100}%` }]} />
+          </View>
+        </View>
+
+        {/* Main Growth Card */}
+        <View style={styles.growthCard}>
+          <View style={styles.growthHeader}>
+            <Text style={styles.growthLabel}>Growth Score</Text>
+            <Text style={styles.growthScore}>{metrics?.personalGrowthScore || 0}%</Text>
+          </View>
+          <View style={styles.growthBarBg}>
+            <View style={[styles.growthBarFill, { width: `${metrics?.personalGrowthScore || 0}%` }]} />
+          </View>
+          <Text style={styles.growthInsight}>{getSmartInsight()}</Text>
+        </View>
+
+        {/* Stats Grid */}
+        <View style={styles.statsGrid}>
+          <View style={styles.statBox}>
+            <Ionicons name="checkbox" size={24} color={THEME.colors.primary} />
+            <Text style={styles.statValue}>{Math.round((metrics?.tasksProgress || 0) * 100)}%</Text>
+            <Text style={styles.statLabel}>Tasks</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Ionicons name="flame" size={24} color="#FF8C00" />
+            <Text style={styles.statValue}>{Math.round((metrics?.habitsProgress || 0) * 100)}%</Text>
+            <Text style={styles.statLabel}>Habits</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Ionicons name="trending-up" size={24} color="#00C9A7" />
+            <Text style={styles.statValue}>{Math.round((metrics?.goalsProgress || 0) * 100)}%</Text>
+            <Text style={styles.statLabel}>Goals</Text>
+          </View>
+        </View>
+
+        {/* Quote Section */}
         <View style={styles.quoteCard}>
-          <View style={styles.quoteDecor1} />
-          <View style={styles.quoteDecor2} />
-          <View style={styles.quoteCardBg}>
-            <TouchableOpacity
-              style={styles.refreshQuoteBtn}
-              onPress={fetchQuote}
-              disabled={isQuoteLoading}
-            >
-              <Ionicons
-                name={isQuoteLoading ? "hourglass-outline" : "refresh"}
-                size={20}
-                color="#FFF"
-              />
-            </TouchableOpacity>
-            <Ionicons
-              name="chatbubbles-outline"
-              size={24}
-              color="#FFF"
-              style={{ marginBottom: 8 }}
-            />
-            <Text style={styles.quoteText}>"{quote.text}"</Text>
-            <Text style={styles.quoteAuthor}>— {quote.author}</Text>
-          </View>
-        </View>
-
-        {/* Smart Insights */}
-        <View style={styles.insightCard}>
-          <View style={styles.insightIconBg}>
-            <Text style={{ fontSize: 24 }}>💡</Text>
-          </View>
-          <View style={styles.insightTextContainer}>
-            <Text style={styles.insightTitle}>Smart Insight</Text>
-            <Text style={styles.insightMessage}>"{smartInsight}"</Text>
-          </View>
-        </View>
-
-        {/* Personal Growth Score */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Personal Growth Score</Text>
-          <View style={styles.scoreRowLarge}>
-            <View style={styles.scoreCircleLarge}>
-              <Text style={styles.scoreValueLarge}>{personalGrowthScore}</Text>
-              <Text style={styles.scoreTotalLarge}>/ 100</Text>
-            </View>
-            <View style={styles.scoreMsgContainerLarge}>
-              <Text style={styles.growthMessageText}>{growthMessage}</Text>
-              <View style={styles.scoreBreakdown}>
-                <Text style={styles.breakdownItem}>Tasks: {Math.round(taskScoreContribution)}%</Text>
-                <Text style={styles.breakdownItem}>Habits: {Math.round(habitScoreContribution)}%</Text>
-                <Text style={styles.breakdownItem}>Goals: {Math.round(goalsScoreContribution)}%</Text>
-              </View>
-            </View>
-          </View>
-          <View style={styles.barContainer}>
-            <View style={styles.scoreBarBgLarge}>
-              <View
-                style={[
-                  styles.scoreBarFillLarge,
-                  {
-                    width: `${personalGrowthScore}%`,
-                    backgroundColor: personalGrowthScore > 70 ? "#00C9A7" : personalGrowthScore > 40 ? "#6C63FF" : "#FF6347"
-                  },
-                ]}
-              />
-            </View>
-          </View>
-        </View>
-
-        {/* Productivity Score (Daily) */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Daily Productivity Score</Text>
-          <View style={styles.scoreRow}>
-            <View style={styles.scoreCircle}>
-              <Text style={styles.scoreValue}>{scoreInt}</Text>
-              <Text style={styles.scoreTotal}>/ 100</Text>
-            </View>
-            <View style={styles.scoreMsgContainer}>
-              <Text style={styles.scoreMsgText}>{scoreMessage}</Text>
-            </View>
-          </View>
-          <View style={styles.scoreBarBg}>
-            <View
-              style={[
-                styles.scoreBarFill,
-                { width: `${scoreInt}%`, backgroundColor: "#6C63FF" },
-              ]}
-            />
-          </View>
-        </View>
-
-        {/* Daily Progress */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Today's Progress</Text>
-
-          <View style={styles.progressItem}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressLabel}>Tasks</Text>
-              <Text style={styles.progressRatio}>
-                {completedTasks} / {totalTasks} completed
-              </Text>
-            </View>
-            <View style={styles.progressBarBg}>
-              <View
-                style={[
-                  styles.progressBarFill,
-                  { width: `${tasksProgress * 100}%`, backgroundColor: "#6C63FF" },
-                ]}
-              />
-            </View>
-          </View>
-
-          <View style={styles.progressItem}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressLabel}>Habits</Text>
-              <Text style={styles.progressRatio}>
-                {completedHabits} / {totalHabits} completed
-              </Text>
-            </View>
-            <View style={styles.progressBarBg}>
-              <View
-                style={[
-                  styles.progressBarFill,
-                  { width: `${habitsProgress * 100}%`, backgroundColor: "#00C9A7" },
-                ]}
-              />
-            </View>
-          </View>
-
-          {totalTasks === 0 && totalHabits === 0 && (
-            <Text style={styles.emptyInlineText}>
-              No tasks or habits for today yet. Add some to get started!
-            </Text>
-          )}
-        </View>
-
-        {/* Finance Snapshot */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Finance Snapshot</Text>
-          {transactions.length === 0 ? (
-            <Text style={styles.emptyInlineText}>
-              No active finances found. Track your first expense!
-            </Text>
-          ) : (
-            <View style={styles.financeRow}>
-              <View
-                style={[styles.financeMiniCard, { backgroundColor: "#e8f5e9" }]}
-              >
-                <Text style={[styles.financeLabel, { color: "#2e7d32" }]}>
-                  Income
-                </Text>
-                <Text style={[styles.financeVal, { color: "#2e7d32" }]}>
-                  ₹{income.toLocaleString("en-IN")}
-                </Text>
-              </View>
-              <View
-                style={[styles.financeMiniCard, { backgroundColor: "#ffebee" }]}
-              >
-                <Text style={[styles.financeLabel, { color: "#c62828" }]}>
-                  Expenses
-                </Text>
-                <Text style={[styles.financeVal, { color: "#c62828" }]}>
-                  ₹{expenses.toLocaleString("en-IN")}
-                </Text>
-              </View>
-              <View
-                style={[styles.financeMiniCard, { backgroundColor: "#f3e5f5" }]}
-              >
-                <Text style={[styles.financeLabel, { color: "#6a1b9a" }]}>
-                  Savings
-                </Text>
-                <Text style={[styles.financeVal, { color: "#6a1b9a" }]}>
-                  ₹{savings.toLocaleString("en-IN")}
-                </Text>
-              </View>
-            </View>
-          )}
-        </View>
-
-        {/* Active Goals */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Active Goals</Text>
-          {activeGoals.length > 0 ? (
-            activeGoals.map((goal, i) => {
-              const rawProgress = (goal.currentValue / Math.max(goal.targetValue, 1)) * 100;
-              const progress = Math.min(100, Math.max(0, rawProgress));
-              const filledBlocks = Math.round(progress / 10);
-              const emptyBlocks = 10 - filledBlocks;
-              const barText = "█".repeat(filledBlocks) + "░".repeat(emptyBlocks);
-
-              return (
-                <View key={goal.id} style={[{ marginBottom: i === activeGoals.length - 1 ? 0 : 16, marginTop: i === 0 ? 8 : 0 }]}>
-                  <Text style={styles.goalTitleList}>{goal.title}</Text>
-                  <Text style={styles.barTextMode}>
-                    {barText} {progress.toFixed(0)}%
-                  </Text>
-                </View>
-              );
-            })
-          ) : (
-            <Text style={styles.emptyInlineText}>
-              No active goals right now. Set a new target!
-            </Text>
-          )}
-        </View>
-
-        {/* Streak & Chart Row */}
-        <View style={styles.flexRow}>
-          <View style={[styles.card, { flex: 1, marginRight: 8 }]}>
-            <Text style={styles.cardTitle}>🔥 Current Streak</Text>
-            <Text style={styles.streakVal}>{maxStreak}</Text>
-            <Text style={styles.streakLabel}>days consistency</Text>
-          </View>
-
-          <View style={[styles.card, { flex: 1, marginLeft: 8 }]}>
-            <Text style={styles.cardTitle}>Weekly Activity</Text>
-            <View style={styles.chartRow}>
-              {weekData.map((d, i) => (
-                <View key={i} style={styles.chartCol}>
-                  <View style={styles.chartBarBg}>
-                    <View
-                      style={[
-                        styles.chartBarFill,
-                        { height: `${(d.count / maxActivity) * 100}%` },
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.chartLabel}>{d.label.charAt(0)}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        </View>
-
-        {/* Weekly Summary */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Weekly Summary</Text>
-
-          <View style={styles.weeklyGrid}>
-            <View style={styles.weeklyStatBox}>
-              <Text style={styles.weeklyStatLabel}>Tasks Completed</Text>
-              <Text style={styles.weeklyStatValue}>{weeklyTasksCompleted}</Text>
-            </View>
-            <View style={styles.weeklyStatBox}>
-              <Text style={styles.weeklyStatLabel}>Habits Completed</Text>
-              <Text style={styles.weeklyStatValue}>{weeklyHabitsCompleted}</Text>
-            </View>
-            <View style={styles.weeklyStatBox}>
-              <Text style={styles.weeklyStatLabel}>Money Spent</Text>
-              <Text style={styles.weeklyStatValue}>₹{weeklyExpenses.toLocaleString("en-IN")}</Text>
-            </View>
-            <View style={styles.weeklyStatBox}>
-              <Text style={styles.weeklyStatLabel}>Savings Added</Text>
-              <Text style={styles.weeklyStatValue}>₹{weeklySavings.toLocaleString("en-IN")}</Text>
-            </View>
-          </View>
-
-          <View style={[styles.progressItem, { marginTop: 16, marginBottom: 0 }]}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressLabel}>Weekly Productivity Score</Text>
-              <Text style={styles.progressRatio}>{weeklyScoreInt}%</Text>
-            </View>
-            <View style={styles.progressBarBg}>
-              <View
-                style={[
-                  styles.progressBarFill,
-                  { width: `${weeklyScoreInt}%`, backgroundColor: "#6C63FF" },
-                ]}
-              />
-            </View>
-          </View>
+          <Ionicons name="chatbubble-ellipses-outline" size={20} color={THEME.colors.primary} style={{ opacity: 0.3 }} />
+          <Text style={styles.quoteText}>{quote.text}</Text>
+          <Text style={styles.quoteAuthor}>— {quote.author}</Text>
         </View>
 
         {/* Quick Actions */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Quick Actions</Text>
-          <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={() => router.push("/tasks")}
-            >
-              <View
-                style={[styles.actionIconBg, { backgroundColor: "#E6E4FF" }]}
-              >
-                <Ionicons name="checkbox-outline" size={24} color="#6C63FF" />
-              </View>
-              <Text style={styles.actionText}>Add Task</Text>
-            </TouchableOpacity>
+        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actionsRow}>
+          <TouchableOpacity style={styles.actionBtn} onPress={() => router.push("/tasks")}>
+            <View style={[styles.actionIcon, { backgroundColor: '#E0E7FF' }]}><Ionicons name="add-circle" size={24} color={THEME.colors.primary} /></View>
+            <Text style={styles.actionLabel}>Task</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionBtn} onPress={() => router.push("/habits")}>
+            <View style={[styles.actionIcon, { backgroundColor: '#FEF3C7' }]}><Ionicons name="calendar" size={24} color="#D97706" /></View>
+            <Text style={styles.actionLabel}>Habit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionBtn} onPress={() => router.push("/finance")}>
+            <View style={[styles.actionIcon, { backgroundColor: '#DCFCE7' }]}><Ionicons name="card" size={24} color="#16A34A" /></View>
+            <Text style={styles.actionLabel}>Expense</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionBtn} onPress={() => router.push("/journal")}>
+            <View style={[styles.actionIcon, { backgroundColor: '#FCE7F3' }]}><Ionicons name="book" size={24} color="#DB2777" /></View>
+            <Text style={styles.actionLabel}>Journal</Text>
+          </TouchableOpacity>
+        </ScrollView>
 
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={() => router.push("/habits")}
-            >
-              <View
-                style={[styles.actionIconBg, { backgroundColor: "#E0F9F5" }]}
-              >
-                <Ionicons name="repeat-outline" size={24} color="#00C9A7" />
-              </View>
-              <Text style={styles.actionText}>Add Habit</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={() => router.push("/finance")}
-            >
-              <View
-                style={[styles.actionIconBg, { backgroundColor: "#FFF0E6" }]}
-              >
-                <Ionicons name="wallet-outline" size={24} color="#FF8C00" />
-              </View>
-              <Text style={styles.actionText}>Expense</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={() => router.push("/journal")}
-            >
-              <View
-                style={[styles.actionIconBg, { backgroundColor: "#E5F0FF" }]}
-              >
-                <Ionicons name="book-outline" size={24} color="#007BFF" />
-              </View>
-              <Text style={styles.actionText}>Journal</Text>
-            </TouchableOpacity>
+        {/* Daily Focus Reminder */}
+        <View style={styles.focusCard}>
+          <View style={styles.focusInfo}>
+            <Text style={styles.focusTitle}>Ready for Focus?</Text>
+            <Text style={styles.focusSub}>Active sessions today: {data.tasks.filter(t => t.completed).length}</Text>
           </View>
-        </View>
-
-        {/* Upcoming Reminders */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Upcoming Reminders</Text>
-          {reminders.length > 0 ? (
-            reminders.map((r, i) => {
-              let iconColor = "#6C63FF";
-              if (r.type === "Habit") iconColor = "#FF8C00";
-              if (r.type === "Goal") iconColor = "#2ECC71";
-
-              return (
-                <View
-                  key={r.id}
-                  style={[
-                    styles.reminderRow,
-                    i === reminders.length - 1 && { borderBottomWidth: 0 },
-                  ]}
-                >
-                  <View style={styles.reminderIconBg}>
-                    <Ionicons name={r.icon as any} size={22} color={iconColor} />
-                  </View>
-                  <View style={styles.reminderTextCont}>
-                    <Text style={styles.reminderTitle} numberOfLines={1}>
-                      {r.text}
-                    </Text>
-                    <Text style={styles.reminderSub}>{r.type} {r.type === "Goal" ? "" : "- Today"}</Text>
-                  </View>
-                </View>
-              );
-            })
-          ) : (
-            <View style={styles.emptyState}>
-              <Ionicons name="calendar-outline" size={36} color="#D1D5DB" />
-              <Text style={styles.emptyText}>No upcoming reminders</Text>
-            </View>
-          )}
+          <TouchableOpacity style={styles.focusBtn} onPress={() => router.push("/tasks")}>
+            <Text style={styles.focusBtnText}>Start Timer</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </View>
@@ -784,479 +169,49 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#F5F7FB",
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#F5F7FB",
-  },
-  container: {
-    padding: 20,
-    paddingBottom: 40,
-    paddingTop: 10,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 24,
-  },
-  greeting: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#1A1A1A",
-  },
-  date: {
-    fontSize: 14,
-    color: "#666",
-    marginTop: 4,
-    fontWeight: "500",
-  },
-  notificationBtn: {
-    width: 44,
-    height: 44,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 22,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  notificationBadge: {
-    position: "absolute",
-    top: 12,
-    right: 12,
-    width: 8,
-    height: 8,
-    backgroundColor: "#FF6347",
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: "#FFF",
-  },
-  card: {
-    backgroundColor: "#FFFFFF",
-    padding: 18,
-    borderRadius: 20,
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#1A1A1A",
-    marginBottom: 16,
-  },
-  scoreRowLarge: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  scoreCircleLarge: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#F0EFFF",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 4,
-    borderColor: "#6C63FF",
-  },
-  scoreValueLarge: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#1A1A1A",
-  },
-  scoreTotalLarge: {
-    fontSize: 12,
-    color: "#666",
-    fontWeight: "600",
-  },
-  scoreMsgContainerLarge: {
-    flex: 1,
-    marginLeft: 20,
-  },
-  growthMessageText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#1A1A1A",
-    marginBottom: 8,
-  },
-  scoreBreakdown: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  breakdownItem: {
-    fontSize: 12,
-    color: "#666",
-    backgroundColor: "#F5F7FB",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  barContainer: {
-    marginTop: 10,
-  },
-  scoreBarBgLarge: {
-    height: 12,
-    backgroundColor: "#F0F0F0",
-    borderRadius: 6,
-    overflow: "hidden",
-  },
-  scoreBarFillLarge: {
-    height: "100%",
-    borderRadius: 6,
-  },
-  quoteCard: {
-    backgroundColor: "#6C63FF",
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: "#6C63FF",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
-    overflow: "hidden",
-  },
-  quoteCardBg: {
-    position: "relative",
-    zIndex: 1,
-  },
-  refreshQuoteBtn: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    padding: 4,
-    zIndex: 10,
-  },
-  quoteText: {
-    fontSize: 16,
-    color: "#FFFFFF",
-    fontStyle: "italic",
-    lineHeight: 24,
-    fontWeight: "500",
-  },
-  quoteAuthor: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.8)",
-    marginTop: 12,
-    fontWeight: "600",
-    textAlign: "right",
-  },
-  quoteDecor1: {
-    position: "absolute",
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    top: -40,
-    right: -20,
-  },
-  quoteDecor2: {
-    position: "absolute",
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    bottom: -20,
-    left: -20,
-  },
-  scoreRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  scoreCircle: {
-    flexDirection: "row",
-    alignItems: "baseline",
-  },
-  scoreValue: {
-    fontSize: 36,
-    fontWeight: "800",
-    color: "#1A1A1A",
-  },
-  scoreTotal: {
-    fontSize: 16,
-    color: "#A0A0A0",
-    fontWeight: "600",
-    marginLeft: 4,
-  },
-  scoreMsgContainer: {
-    flex: 1,
-    marginLeft: 16,
-    paddingLeft: 16,
-    borderLeftWidth: 2,
-    borderLeftColor: "#F5F7FB",
-  },
-  scoreMsgText: {
-    fontSize: 14,
-    color: "#666",
-    fontWeight: "500",
-    lineHeight: 20,
-  },
-  scoreBarBg: {
-    height: 10,
-    backgroundColor: "#F5F7FB",
-    borderRadius: 5,
-    overflow: "hidden",
-  },
-  scoreBarFill: {
-    height: "100%",
-    borderRadius: 5,
-  },
-  progressItem: {
-    marginBottom: 16,
-  },
-  progressHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  progressLabel: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#1A1A1A",
-  },
-  progressRatio: {
-    fontSize: 14,
-    color: "#666",
-    fontWeight: "500",
-  },
-  progressBarBg: {
-    height: 8,
-    backgroundColor: "#F5F7FB",
-    borderRadius: 4,
-    overflow: "hidden",
-  },
-  progressBarFill: {
-    height: "100%",
-    borderRadius: 4,
-  },
-  financeRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  financeMiniCard: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 12,
-    marginHorizontal: 4,
-    alignItems: "center",
-  },
-  financeLabel: {
-    fontSize: 11,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    marginBottom: 4,
-  },
-  financeVal: {
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  actionRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  actionBtn: {
-    flex: 1,
-    alignItems: "center",
-  },
-  actionIconBg: {
-    width: 60,
-    height: 60,
-    borderRadius: 18,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  actionText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#333",
-  },
-  flexRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  streakVal: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#FF8C00",
-    marginTop: 8,
-  },
-  streakLabel: {
-    fontSize: 13,
-    color: "#888",
-    marginTop: 4,
-    fontWeight: "500",
-  },
-  chartRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    height: 70,
-  },
-  chartCol: {
-    alignItems: "center",
-    width: 16,
-  },
-  chartBarBg: {
-    width: 10,
-    height: 50,
-    backgroundColor: "#F5F7FB",
-    borderRadius: 5,
-    justifyContent: "flex-end",
-    marginBottom: 6,
-  },
-  chartBarFill: {
-    width: "100%",
-    backgroundColor: "#6C63FF",
-    borderRadius: 5,
-  },
-  chartLabel: {
-    fontSize: 11,
-    color: "#A0A0A0",
-    fontWeight: "600",
-  },
-  reminderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F5F7FB",
-  },
-  reminderIconBg: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: "#F5F7FB",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  reminderTextCont: {
-    flex: 1,
-  },
-  reminderTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#1A1A1A",
-    marginBottom: 4,
-  },
-  reminderSub: {
-    fontSize: 13,
-    color: "#888",
-    fontWeight: "500",
-  },
-  emptyState: {
-    alignItems: "center",
-    padding: 16,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: "#A0A0A0",
-    marginTop: 8,
-    fontWeight: "500",
-  },
-  emptyInlineText: {
-    fontSize: 14,
-    color: "#A0A0A0",
-    fontStyle: "italic",
-    textAlign: "center",
-    marginTop: 8,
-  },
-  goalTitleList: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#1A1A1A",
-    marginBottom: 6,
-  },
-  barTextMode: {
-    fontFamily: "monospace",
-    fontSize: 14,
-    color: "#6C63FF",
-    letterSpacing: 2,
-  },
-  weeklyGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-  },
-  weeklyStatBox: {
-    width: "48%",
-    backgroundColor: "#F5F7FB",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  weeklyStatLabel: {
-    fontSize: 13,
-    color: "#666",
-    fontWeight: "500",
-    marginBottom: 8,
-  },
-  weeklyStatValue: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#1A1A1A",
-  },
-  insightCard: {
-    backgroundColor: "#FFF9E6",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    shadowColor: "#FFD700",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: "#FFEAA7",
-  },
-  insightIconBg: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#FFF",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  insightTextContainer: {
-    flex: 1,
-  },
-  insightTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#B8860B",
-    marginBottom: 4,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  insightMessage: {
-    fontSize: 15,
-    color: "#333",
-    fontWeight: "500",
-    fontStyle: "italic",
-    lineHeight: 22,
-  },
+  safeArea: { flex: 1, backgroundColor: THEME.colors.background },
+  container: { padding: 20, paddingBottom: 40 },
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
+  greeting: { fontSize: 24, fontWeight: "800", color: THEME.colors.text },
+  date: { fontSize: 14, color: THEME.colors.textLight, marginTop: 4 },
+  levelBadge: { backgroundColor: THEME.colors.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  levelText: { color: "#FFF", fontWeight: "bold", fontSize: 12 },
+
+  levelProgressContainer: { marginBottom: 24 },
+  levelInfoRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
+  levelTitle: { fontSize: 16, fontWeight: "700", color: THEME.colors.text },
+  xpText: { fontSize: 14, color: THEME.colors.primary, fontWeight: "600" },
+  levelBarBg: { height: 6, backgroundColor: "#E5E7EB", borderRadius: 3, overflow: "hidden" },
+  levelBarFill: { height: "100%", backgroundColor: THEME.colors.primary },
+
+  growthCard: { backgroundColor: THEME.colors.white, borderRadius: 24, padding: 24, marginBottom: 24, shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.05, shadowRadius: 20, elevation: 5 },
+  growthHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 },
+  growthLabel: { fontSize: 16, color: THEME.colors.textLight, fontWeight: "600" },
+  growthScore: { fontSize: 32, fontWeight: "900", color: THEME.colors.text },
+  growthBarBg: { height: 12, backgroundColor: "#F3F4F6", borderRadius: 6, overflow: "hidden", marginBottom: 16 },
+  growthBarFill: { height: "100%", backgroundColor: THEME.colors.secondary },
+  growthInsight: { fontSize: 14, color: THEME.colors.textLight, lineHeight: 20, fontStyle: "italic" },
+
+  statsGrid: { flexDirection: "row", justifyContent: "space-between", marginBottom: 24 },
+  statBox: { backgroundColor: THEME.colors.white, width: '30%', padding: 16, borderRadius: 20, alignItems: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 10, elevation: 2 },
+  statValue: { fontSize: 18, fontWeight: "800", color: THEME.colors.text, marginTop: 8 },
+  statLabel: { fontSize: 12, color: THEME.colors.textLight, marginTop: 2 },
+
+  quoteCard: { backgroundColor: "#F9FAFB", borderRadius: 20, padding: 20, marginBottom: 24, borderLeftWidth: 4, borderLeftColor: THEME.colors.primary },
+  quoteText: { fontSize: 16, color: THEME.colors.text, fontWeight: "600", lineHeight: 24, marginBottom: 8 },
+  quoteAuthor: { fontSize: 14, color: THEME.colors.textLight, fontWeight: "500" },
+
+  sectionTitle: { fontSize: 18, fontWeight: "700", color: THEME.colors.text, marginBottom: 16 },
+  actionsRow: { paddingRight: 20, marginBottom: 24 },
+  actionBtn: { alignItems: "center", marginRight: 24 },
+  actionIcon: { width: 56, height: 56, borderRadius: 16, justifyContent: "center", alignItems: "center", marginBottom: 8 },
+  actionLabel: { fontSize: 13, fontWeight: "600", color: THEME.colors.text },
+
+  focusCard: { backgroundColor: "#1F2937", borderRadius: 24, padding: 20, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  focusInfo: { flex: 1 },
+  focusTitle: { color: "#FFF", fontSize: 18, fontWeight: "700", marginBottom: 4 },
+  focusSub: { color: "#9CA3AF", fontSize: 13 },
+  focusBtn: { backgroundColor: THEME.colors.primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
+  focusBtnText: { color: "#FFF", fontWeight: "700", fontSize: 14 },
 });
