@@ -5,7 +5,6 @@ import {
   Alert,
   Dimensions,
   FlatList,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
@@ -13,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { PieChart } from 'react-native-chart-kit';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface Transaction {
   id: string;
@@ -29,6 +29,7 @@ const EXPENSE_CATEGORIES = ['Food', 'Transport', 'Bills', 'Shopping', 'Other'];
 const INCOME_CATEGORIES = ['Salary', 'Freelance', 'Investments', 'Gift', 'Other'];
 
 export default function FinanceScreen() {
+  const insets = useSafeAreaInsets();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [amount, setAmount] = useState('');
   const [type, setType] = useState<'income' | 'expense'>('expense');
@@ -170,7 +171,7 @@ export default function FinanceScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <FlatList
         data={transactions}
         keyExtractor={(item) => item.id}
@@ -301,7 +302,7 @@ export default function FinanceScreen() {
           </View>
         }
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
