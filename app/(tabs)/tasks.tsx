@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { useEffect, useRef, useState } from "react";
 import {
+  Alert,
   FlatList,
   StyleSheet,
   Text,
@@ -18,6 +19,8 @@ interface Task {
 }
 
 const TASK_STORAGE_KEY = "tasks_storage";
+const FOCUS_SESSIONS_STORAGE_KEY = "focus_sessions_storage";
+const FOCUS_DATE_STORAGE_KEY = "focus_date_storage";
 
 export default function TasksScreen() {
   const insets = useSafeAreaInsets();
@@ -25,6 +28,73 @@ export default function TasksScreen() {
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const flatListRef = useRef<FlatList>(null);
   const [isReady, setIsReady] = useState(false);
+
+  // Focus Timer State
+  const FOCUS_DURATION = 25 * 60;
+  const [timeLeft, setTimeLeft] = useState(FOCUS_DURATION);
+  const [isActive, setIsActive] = useState(false);
+  const [focusSessionsToday, setFocusSessionsToday] = useState(0);
+
+  // Load Focus Sessions
+  useEffect(() => {
+    const loadFocusData = async () => {
+      try {
+        const storedDate = await AsyncStorage.getItem(FOCUS_DATE_STORAGE_KEY);
+        const today = new Date().toDateString();
+
+        if (storedDate === today) {
+          const storedSessions = await AsyncStorage.getItem(FOCUS_SESSIONS_STORAGE_KEY);
+          if (storedSessions) {
+            setFocusSessionsToday(parseInt(storedSessions, 10));
+          }
+        } else {
+          await AsyncStorage.setItem(FOCUS_DATE_STORAGE_KEY, today);
+          await AsyncStorage.setItem(FOCUS_SESSIONS_STORAGE_KEY, "0");
+        }
+      } catch (error) {
+        console.error("Failed to load focus data:", error);
+      }
+    };
+    loadFocusData();
+  }, []);
+
+  // Focus Timer Logic
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    if (isActive && timeLeft > 0) {
+      interval = setInterval(() => {
+        setTimeLeft((prev) => prev - 1);
+      }, 1000);
+    } else if (isActive && timeLeft === 0) {
+      setIsActive(false);
+      setTimeLeft(FOCUS_DURATION);
+      handleFocusComplete();
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isActive, timeLeft]);
+
+  const handleFocusComplete = async () => {
+    Alert.alert("Focus session complete!");
+    try {
+      const newCount = focusSessionsToday + 1;
+      setFocusSessionsToday(newCount);
+      await AsyncStorage.setItem(FOCUS_SESSIONS_STORAGE_KEY, newCount.toString());
+      const today = new Date().toDateString();
+      await AsyncStorage.setItem(FOCUS_DATE_STORAGE_KEY, today);
+    } catch (error) {
+      console.error("Failed to save focus data:", error);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  };
 
   // Load tasks on mount
   useEffect(() => {
@@ -148,6 +218,30 @@ export default function TasksScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Focus Mode Section */}
+        <View style={styles.focusContainer}>
+          <Text style={styles.focusTitle}>Focus Mode</Text>
+          <Text style={styles.focusTimer}>{formatTime(timeLeft)}</Text>
+          <View style={styles.focusButtons}>
+            <TouchableOpacity
+              style={[styles.focusButton, isActive ? styles.focusButtonPause : styles.focusButtonStart]}
+              onPress={() => setIsActive(!isActive)}
+            >
+              <Text style={styles.focusButtonText}>{isActive ? "Pause" : "Start"}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.focusButton, styles.focusButtonReset]}
+              onPress={() => {
+                setIsActive(false);
+                setTimeLeft(FOCUS_DURATION);
+              }}
+            >
+              <Text style={[styles.focusButtonText, { color: "#1A1A1A" }]}>Reset</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.focusSessionsText}>Focus Sessions Today: {focusSessionsToday}</Text>
+        </View>
+
         {/* Task List Section */}
         <FlatList
           ref={flatListRef}
@@ -223,6 +317,62 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
+  },
+  focusContainer: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  focusTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1A1A1A",
+    marginBottom: 12,
+  },
+  focusTimer: {
+    fontSize: 48,
+    fontWeight: "800",
+    color: "#6C63FF",
+    marginBottom: 20,
+    fontVariant: ["tabular-nums"],
+  },
+  focusButtons: {
+    flexDirection: "row",
+    gap: 16,
+    marginBottom: 16,
+  },
+  focusButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    minWidth: 100,
+    alignItems: "center",
+  },
+  focusButtonStart: {
+    backgroundColor: "#6C63FF",
+  },
+  focusButtonPause: {
+    backgroundColor: "#FF9F43",
+  },
+  focusButtonReset: {
+    backgroundColor: "#F5F7FB",
+  },
+  focusButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  focusSessionsText: {
+    fontSize: 14,
+    color: "#666666",
+    fontWeight: "500",
   },
   listContainer: {
     paddingBottom: 24,

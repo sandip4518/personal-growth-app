@@ -308,6 +308,25 @@ export default function HomeScreen() {
     })),
   ].slice(0, 4); // Only show top 4 reminders
 
+  // 8. SMART INSIGHTS
+  let smartInsight = "You are building strong consistency.";
+
+  const foodExpensesWeek = transactions
+    .filter((t) => t.type === "expense" && weekDateStrs.includes(t.date) && (t.category?.toLowerCase().includes("food") || t.category?.toLowerCase().includes("dining")))
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  if (foodExpensesWeek >= 2000) {
+    smartInsight = `You spent ₹${foodExpensesWeek.toLocaleString("en-IN")} on food this week. Consider reducing dining expenses.`;
+  } else if (totalHabits > 0 && completedHabits === 0) {
+    smartInsight = "You haven't completed any habits today.";
+  } else if (totalTasks > 0 && tasksProgress >= 0.8) {
+    smartInsight = `You completed ${Math.round(tasksProgress * 100)}% of tasks this week. Great work!`;
+  } else if (maxStreak >= 3) {
+    smartInsight = "You are building strong consistency.";
+  } else if (weeklyExpenses > 5000) {
+    smartInsight = `You spent ₹${weeklyExpenses.toLocaleString("en-IN")} this week. Keep an eye on your budget.`;
+  }
+
   return (
     <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       <ScrollView
@@ -362,6 +381,17 @@ export default function HomeScreen() {
             />
             <Text style={styles.quoteText}>"{quote.text}"</Text>
             <Text style={styles.quoteAuthor}>— {quote.author}</Text>
+          </View>
+        </View>
+
+        {/* Smart Insights */}
+        <View style={styles.insightCard}>
+          <View style={styles.insightIconBg}>
+            <Text style={{ fontSize: 24 }}>💡</Text>
+          </View>
+          <View style={styles.insightTextContainer}>
+            <Text style={styles.insightTitle}>Smart Insight</Text>
+            <Text style={styles.insightMessage}>"{smartInsight}"</Text>
           </View>
         </View>
 
@@ -1031,5 +1061,52 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700",
     color: "#1A1A1A",
+  },
+  insightCard: {
+    backgroundColor: "#FFF9E6",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    shadowColor: "#FFD700",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: "#FFEAA7",
+  },
+  insightIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#FFF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  insightTextContainer: {
+    flex: 1,
+  },
+  insightTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#B8860B",
+    marginBottom: 4,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  insightMessage: {
+    fontSize: 15,
+    color: "#333",
+    fontWeight: "500",
+    fontStyle: "italic",
+    lineHeight: 22,
   },
 });
