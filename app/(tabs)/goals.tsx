@@ -344,9 +344,38 @@ export default function GoalsScreen() {
     const getMotivationalMessage = (percentage: number) => {
         if (percentage >= 100) return "🎉 Goal Completed!";
         if (percentage >= 75) return "Almost there!";
-        if (percentage >= 50) return "Great consistency!";
-        if (percentage >= 25) return "You're making progress!";
-        return "Let's get started!";
+        if (percentage >= 50) return "Great consistency.";
+        if (percentage >= 25) return "You're building momentum.";
+        return "Let's begin!";
+    };
+
+    const calculatePlanningBreakdown = (targetValue: number, deadline: string) => {
+        if (!targetValue || isNaN(targetValue)) return null;
+
+        const deadlineMatch = deadline.toLowerCase().match(/(\d+)\s*(month|week|day)s?/);
+        let totalDays = 0;
+
+        if (deadlineMatch) {
+            const val = parseInt(deadlineMatch[1]);
+            const unit = deadlineMatch[2];
+            if (unit === "month") totalDays = val * 30;
+            else if (unit === "week") totalDays = val * 7;
+            else if (unit === "day") totalDays = val;
+        } else {
+            // Try to parse as a date or relative time? 
+            // For now, if it's just a number, assume days.
+            const val = parseInt(deadline);
+            if (!isNaN(val)) totalDays = val;
+            else return null; // Can't parse
+        }
+
+        if (totalDays <= 0) return null;
+
+        const monthly = totalDays >= 30 ? Math.ceil((targetValue / (totalDays / 30)) / 50) * 50 : null;
+        const weekly = totalDays >= 7 ? Math.ceil((targetValue / (totalDays / 7)) / 10) * 10 : null;
+        const daily = Math.ceil((targetValue / totalDays) / 5) * 5;
+
+        return { monthly, weekly, daily };
     };
 
     const renderGoal = ({ item }: { item: Goal }) => {
@@ -427,15 +456,44 @@ export default function GoalsScreen() {
                         {barText} {progress.toFixed(0)}%
                     </Text>
                     <View style={styles.progressBarBg}>
-                        <View
-                            style={[
-                                styles.progressBarFill,
-                                { width: `${progress}%`, backgroundColor: progress >= 100 ? "#2ECC71" : "#6C63FF" },
-                            ]}
+                        <View style={[
+                            styles.progressBarFill,
+                            { width: `${progress}%`, backgroundColor: progress >= 100 ? "#2ECC71" : "#6C63FF" },
+                        ]}
                         />
                     </View>
                     <Text style={styles.motivationalText}>{motivationalMessage}</Text>
                 </View>
+
+                {item.targetValue > 0 && !item.completed && (
+                    <View style={styles.planningBreakdown}>
+                        <Text style={styles.planningTitle}>Smart Planning Breakdown</Text>
+                        {(() => {
+                            const breakdown = calculatePlanningBreakdown(item.targetValue, item.deadline);
+                            if (!breakdown) return <Text style={styles.planningHint}>Set a deadline like "6 months" for a breakdown.</Text>;
+                            return (
+                                <View style={styles.planningContent}>
+                                    {breakdown.monthly && (
+                                        <View style={styles.planningRow}>
+                                            <Text style={styles.planningLabel}>Monthly Target:</Text>
+                                            <Text style={styles.planningValue}>{formatValue(breakdown.monthly, item.type)}</Text>
+                                        </View>
+                                    )}
+                                    {breakdown.weekly && (
+                                        <View style={styles.planningRow}>
+                                            <Text style={styles.planningLabel}>Weekly Target:</Text>
+                                            <Text style={styles.planningValue}>{formatValue(breakdown.weekly, item.type)}</Text>
+                                        </View>
+                                    )}
+                                    <View style={styles.planningRow}>
+                                        <Text style={styles.planningLabel}>Daily Target:</Text>
+                                        <Text style={styles.planningValue}>{formatValue(breakdown.daily, item.type)}</Text>
+                                    </View>
+                                </View>
+                            );
+                        })()}
+                    </View>
+                )}
 
                 <View style={styles.goalFooter}>
                     <Text style={styles.progressText}>
@@ -752,8 +810,46 @@ const styles = StyleSheet.create({
     },
     motivationalText: {
         fontSize: 13,
-        color: "#FF8C00",
+        color: "#6C63FF",
         fontWeight: "600",
+        fontStyle: "italic",
+    },
+    planningBreakdown: {
+        backgroundColor: "#F9F9FF",
+        padding: 12,
+        borderRadius: 12,
+        marginTop: 12,
+        borderWidth: 1,
+        borderColor: "#E8E6FF",
+    },
+    planningTitle: {
+        fontSize: 12,
+        fontWeight: "700",
+        color: "#6C63FF",
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
+        marginBottom: 8,
+    },
+    planningContent: {
+        gap: 4,
+    },
+    planningRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+    },
+    planningLabel: {
+        fontSize: 13,
+        color: "#666",
+    },
+    planningValue: {
+        fontSize: 14,
+        fontWeight: "700",
+        color: "#1A1A1A",
+    },
+    planningHint: {
+        fontSize: 12,
+        color: "#AAA",
         fontStyle: "italic",
     },
     goalFooter: {

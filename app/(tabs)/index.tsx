@@ -45,10 +45,18 @@ interface Goal {
   subgoals?: any[];
 }
 
+interface JournalEntry {
+  id: string;
+  date: string;
+  mood: string;
+  reflection: string;
+}
+
 const GOALS_STORAGE = "GOALS_STORAGE";
 const TASK_STORAGE_KEY = "tasks_storage";
 const HABITS_STORAGE_KEY = "HABITS_STORAGE";
 const FINANCE_STORAGE_KEY = "FINANCE_STORAGE";
+const JOURNAL_STORAGE = "JOURNAL_STORAGE";
 
 const formatDate = (date: Date) => {
   const year = date.getFullYear();
@@ -96,25 +104,29 @@ export default function HomeScreen() {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
 
   const [quote, setQuote] = useState(QUOTES[0]);
   const [isQuoteLoading, setIsQuoteLoading] = useState(false);
 
   const loadData = async () => {
     try {
-      const [storedTasks, storedHabits, storedFinance, storedUser, storedGoals] =
-        await Promise.all([
-          AsyncStorage.getItem(TASK_STORAGE_KEY),
-          AsyncStorage.getItem(HABITS_STORAGE_KEY),
-          AsyncStorage.getItem(FINANCE_STORAGE_KEY),
-          AsyncStorage.getItem("USER_DATA"),
-          AsyncStorage.getItem(GOALS_STORAGE),
-        ]);
+      const results = await Promise.all([
+        AsyncStorage.getItem(TASK_STORAGE_KEY),
+        AsyncStorage.getItem(HABITS_STORAGE_KEY),
+        AsyncStorage.getItem(FINANCE_STORAGE_KEY),
+        AsyncStorage.getItem("USER_DATA"),
+        AsyncStorage.getItem(GOALS_STORAGE),
+        AsyncStorage.getItem(JOURNAL_STORAGE),
+      ]);
+
+      const [storedTasks, storedHabits, storedFinance, storedUser, storedGoals, storedJournal] = results;
 
       if (storedTasks) setTasks(JSON.parse(storedTasks));
       if (storedHabits) setHabits(JSON.parse(storedHabits));
       if (storedFinance) setTransactions(JSON.parse(storedFinance));
       if (storedGoals) setGoals(JSON.parse(storedGoals));
+      if (storedJournal) setJournalEntries(JSON.parse(storedJournal));
       if (storedUser) {
         const user = JSON.parse(storedUser);
         if (user.name) setUserName(user.name);
@@ -210,7 +222,52 @@ export default function HomeScreen() {
     .reduce((sum, t) => sum + t.amount, 0);
   const savings = income - expenses;
 
-  // 4. WEEKLY CHART (Mon-Sun)
+  // 4. PERSONAL GROWTH SCORE (Overall)
+  // Weights: Tasks: 25%, Habits: 25%, Goals: 25%, Finance: 15%, Journal: 10%
+
+  // Tasks (25%)
+  const taskRate = totalTasks === 0 ? 0 : completedTasks / totalTasks;
+  const taskScoreContribution = taskRate * 25;
+
+  // Habits (25%)
+  const habitRate = totalHabits === 0 ? 0 : completedHabits / totalHabits;
+  const habitScoreContribution = habitRate * 25;
+
+  // Goals (25%)
+  const totalGoalsProgress = goals.length === 0 ? 0 : goals.reduce((sum, g) => {
+    const p = (g.currentValue / Math.max(g.targetValue, 1));
+    return sum + Math.min(1, Math.max(0, p));
+  }, 0) / goals.length;
+  const goalsScoreContribution = totalGoalsProgress * 25;
+
+  // Finance/Savings (15%) - Using finance goals specifically if any, otherwise savings ratio
+  const financeGoals = goals.filter(g => g.type === 'finance');
+  let financeProgress = 0;
+  if (financeGoals.length > 0) {
+    financeProgress = financeGoals.reduce((sum, g) => sum + (g.currentValue / Math.max(g.targetValue, 1)), 0) / financeGoals.length;
+  } else {
+    financeProgress = income > 0 ? Math.min(1, savings / income) : 0;
+  }
+  const financeScoreContribution = Math.min(1, Math.max(0, financeProgress)) * 15;
+
+  // Journal (10%) - Activity for today
+  const journalTodayFormat = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  const hasJournaledToday = journalEntries.some(e => e.date === journalTodayFormat);
+  const journalScoreContribution = hasJournaledToday ? 10 : 0;
+
+  const personalGrowthScore = Math.round(
+    taskScoreContribution +
+    habitScoreContribution +
+    goalsScoreContribution +
+    financeScoreContribution +
+    journalScoreContribution
+  );
+
+  let growthMessage = "Start building momentum today.";
+  if (personalGrowthScore >= 40 && personalGrowthScore <= 70) growthMessage = "You're making good progress.";
+  if (personalGrowthScore > 70) growthMessage = "Excellent growth!";
+
+  // 5. WEEKLY CHART (Mon-Sun)
   const weekDays = getWeekDays();
   const weekData = weekDays.map((date) => {
     const dStr = formatDate(date);
@@ -256,11 +313,11 @@ export default function HomeScreen() {
   }, 0);
 
   const weeklyExpenses = transactions
-    .filter((t) => t.type === "expense" && weekDateStrs.includes(t.date))
+    .filter((t) => t.type === "expense" && weekDateStrs.includes(t.date?.split("T")[0]))
     .reduce((sum, t) => sum + t.amount, 0);
 
   const weeklyIncome = transactions
-    .filter((t) => t.type === "income" && weekDateStrs.includes(t.date))
+    .filter((t) => t.type === "income" && weekDateStrs.includes(t.date?.split("T")[0]))
     .reduce((sum, t) => sum + t.amount, 0);
 
   const weeklySavings = weeklyIncome - weeklyExpenses;
@@ -312,7 +369,7 @@ export default function HomeScreen() {
   let smartInsight = "You are building strong consistency.";
 
   const foodExpensesWeek = transactions
-    .filter((t) => t.type === "expense" && weekDateStrs.includes(t.date) && (t.category?.toLowerCase().includes("food") || t.category?.toLowerCase().includes("dining")))
+    .filter((t) => t.type === "expense" && weekDateStrs.includes(t.date?.split("T")[0]) && (t.category?.toLowerCase().includes("food") || t.category?.toLowerCase().includes("dining")))
     .reduce((sum, t) => sum + t.amount, 0);
 
   if (foodExpensesWeek >= 2000) {
@@ -395,9 +452,41 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Productivity Score */}
+        {/* Personal Growth Score */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Productivity Score</Text>
+          <Text style={styles.cardTitle}>Personal Growth Score</Text>
+          <View style={styles.scoreRowLarge}>
+            <View style={styles.scoreCircleLarge}>
+              <Text style={styles.scoreValueLarge}>{personalGrowthScore}</Text>
+              <Text style={styles.scoreTotalLarge}>/ 100</Text>
+            </View>
+            <View style={styles.scoreMsgContainerLarge}>
+              <Text style={styles.growthMessageText}>{growthMessage}</Text>
+              <View style={styles.scoreBreakdown}>
+                <Text style={styles.breakdownItem}>Tasks: {Math.round(taskScoreContribution)}%</Text>
+                <Text style={styles.breakdownItem}>Habits: {Math.round(habitScoreContribution)}%</Text>
+                <Text style={styles.breakdownItem}>Goals: {Math.round(goalsScoreContribution)}%</Text>
+              </View>
+            </View>
+          </View>
+          <View style={styles.barContainer}>
+            <View style={styles.scoreBarBgLarge}>
+              <View
+                style={[
+                  styles.scoreBarFillLarge,
+                  {
+                    width: `${personalGrowthScore}%`,
+                    backgroundColor: personalGrowthScore > 70 ? "#00C9A7" : personalGrowthScore > 40 ? "#6C63FF" : "#FF6347"
+                  },
+                ]}
+              />
+            </View>
+          </View>
+        </View>
+
+        {/* Productivity Score (Daily) */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Daily Productivity Score</Text>
           <View style={styles.scoreRow}>
             <View style={styles.scoreCircle}>
               <Text style={styles.scoreValue}>{scoreInt}</Text>
@@ -767,6 +856,67 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#1A1A1A",
     marginBottom: 16,
+  },
+  scoreRowLarge: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  scoreCircleLarge: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#F0EFFF",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 4,
+    borderColor: "#6C63FF",
+  },
+  scoreValueLarge: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#1A1A1A",
+  },
+  scoreTotalLarge: {
+    fontSize: 12,
+    color: "#666",
+    fontWeight: "600",
+  },
+  scoreMsgContainerLarge: {
+    flex: 1,
+    marginLeft: 20,
+  },
+  growthMessageText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#1A1A1A",
+    marginBottom: 8,
+  },
+  scoreBreakdown: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  breakdownItem: {
+    fontSize: 12,
+    color: "#666",
+    backgroundColor: "#F5F7FB",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  barContainer: {
+    marginTop: 10,
+  },
+  scoreBarBgLarge: {
+    height: 12,
+    backgroundColor: "#F0F0F0",
+    borderRadius: 6,
+    overflow: "hidden",
+  },
+  scoreBarFillLarge: {
+    height: "100%",
+    borderRadius: 6,
   },
   quoteCard: {
     backgroundColor: "#6C63FF",
