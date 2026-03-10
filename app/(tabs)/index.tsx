@@ -65,6 +65,13 @@ export default function HomeScreen() {
     return "Consistency is the key to transformation. You're doing great!";
   };
 
+  // Rank Calculation (Real Users Only)
+  const leaderboardData = [
+    { name: data.userName, score: metrics?.personalGrowthScore || 0, avatar: "🌟", isUser: true, level: metrics?.level || 1 },
+  ].sort((a, b) => b.score - a.score).map((item, index) => ({ ...item, rank: index + 1 }));
+
+  const userRank = leaderboardData.find(i => i.isUser)?.rank || 1;
+
   return (
     <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       <ScrollView
@@ -72,14 +79,24 @@ export default function HomeScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={THEME.colors.primary} />}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
+        {/* Header Section */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>{greeting}, {data.userName} 👋</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.greeting} numberOfLines={1}>{greeting}, {data.userName} 👋</Text>
             <Text style={styles.userTitleBadge}>{metrics?.userTitle || "Growth Seeker"}</Text>
           </View>
+        </View>
+
+        {/* Badges Row */}
+        <View style={styles.headerBadgesRow}>
           <TouchableOpacity style={styles.levelBadge} onPress={() => router.push("/profile")}>
             <Text style={styles.levelText}>LVL {metrics?.level || 1}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.levelBadge, { backgroundColor: THEME.colors.secondary, marginLeft: 8 }]}
+            onPress={() => router.push("/leaderboard")}
+          >
+            <Text style={styles.levelText}>RANK #{userRank}</Text>
           </TouchableOpacity>
         </View>
 
@@ -271,8 +288,9 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: THEME.colors.background },
   container: { padding: 20, paddingBottom: 40 },
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
-  greeting: { fontSize: 24, fontWeight: "800", color: THEME.colors.text },
+  header: { marginBottom: 16 },
+  headerBadgesRow: { flexDirection: "row", alignItems: "center", marginBottom: 20 },
+  greeting: { fontSize: 26, fontWeight: "800", color: THEME.colors.text },
   date: { fontSize: 14, color: THEME.colors.textLight, marginTop: 4 },
   levelBadge: { backgroundColor: THEME.colors.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   levelText: { color: "#FFF", fontWeight: "bold", fontSize: 12 },

@@ -9,7 +9,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { BarChart } from "react-native-chart-kit";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -60,6 +60,13 @@ export default function ProfileScreen() {
 
   const averageBalance = (Object.values(lifeBalance).reduce((a, b) => a + b, 0) / Object.values(lifeBalance).length).toFixed(1);
 
+  // Rank Calculation (Real Users Only)
+  const leaderboardData = [
+    { name: data.userName, score: metrics?.personalGrowthScore || 0, avatar: "🌟", rank: 1, isUser: true, level: metrics?.level || 1 },
+  ].sort((a, b) => b.score - a.score).map((item, index) => ({ ...item, rank: index + 1 }));
+
+  const userRank = leaderboardData.find(i => i.isUser)?.rank || 1;
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
@@ -101,6 +108,45 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             ))}
           </ScrollView>
+        </View>
+
+        {/* Growth Score Center */}
+        <View style={styles.growthCardProfile}>
+          <View style={styles.growthHeaderProfile}>
+            <View>
+              <Text style={styles.growthLabel}>Overall Growth</Text>
+              <Text style={styles.growthValue}>{metrics?.personalGrowthScore || 0}%</Text>
+            </View>
+            <TouchableOpacity style={styles.rankBadgeProfile} onPress={() => router.push("/leaderboard")}>
+              <Text style={styles.rankBadgeTextProfile}>RANK #{userRank}</Text>
+              <Ionicons name="chevron-forward" size={12} color="#FFF" style={{ marginLeft: 4 }} />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.growthBarBgProfile}>
+            <View style={[styles.growthBarFillProfile, { width: `${metrics?.personalGrowthScore || 0}%` }]} />
+          </View>
+          <View style={styles.growthBreakdownProfile}>
+            <View style={styles.breakdownItemProfile}>
+              <View style={styles.breakdownIconBox}><Ionicons name="checkbox" size={14} color="#FFF" /></View>
+              <Text style={styles.breakdownValProfile}>{Math.round(metrics?.taskContribution || 0)}</Text>
+              <Text style={styles.breakdownLabProfile}>Tasks</Text>
+            </View>
+            <View style={styles.breakdownItemProfile}>
+              <View style={[styles.breakdownIconBox, { backgroundColor: '#FF8C00' }]}><Ionicons name="flame" size={14} color="#FFF" /></View>
+              <Text style={styles.breakdownValProfile}>{Math.round(metrics?.habitContribution || 0)}</Text>
+              <Text style={styles.breakdownLabProfile}>Habits</Text>
+            </View>
+            <View style={styles.breakdownItemProfile}>
+              <View style={[styles.breakdownIconBox, { backgroundColor: '#00C9A7' }]}><Ionicons name="trending-up" size={14} color="#FFF" /></View>
+              <Text style={styles.breakdownValProfile}>{Math.round(metrics?.goalContribution || 0)}</Text>
+              <Text style={styles.breakdownLabProfile}>Goals</Text>
+            </View>
+            <View style={styles.breakdownItemProfile}>
+              <View style={[styles.breakdownIconBox, { backgroundColor: '#6C63FF' }]}><Ionicons name="star" size={14} color="#FFF" /></View>
+              <Text style={styles.breakdownValProfile}>{Math.round((metrics?.financeContribution || 0) + (metrics?.journalContribution || 0))}</Text>
+              <Text style={styles.breakdownLabProfile}>Extra</Text>
+            </View>
+          </View>
         </View>
 
         {/* Stats Grid - Standardized to Dashboard Style */}
@@ -175,6 +221,29 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Global Leaderboard Highlighting */}
+        <TouchableOpacity style={styles.card} onPress={() => router.push("/leaderboard")}>
+          <View style={styles.cardHeader}>
+            <Ionicons name="trophy-outline" size={20} color="#FFD700" />
+            <Text style={styles.cardTitle}>Global Leaderboard</Text>
+            <View style={styles.viewAllBadge}><Text style={styles.viewAllText}>VIEW ALL</Text></View>
+          </View>
+          <View style={styles.leaderboardList}>
+            {leaderboardData.slice(0, 3).map((item) => (
+              <View key={item.name} style={[styles.leaderboardItem, item.isUser && styles.leaderboardItemUser]}>
+                <View style={styles.leaderboardLeft}>
+                  <Text style={[styles.rankText, item.rank <= 3 && styles.topRank]}>#{item.rank}</Text>
+                  <View style={styles.avatarCircle}><Text style={{ fontSize: 18 }}>{item.avatar}</Text></View>
+                  <Text style={[styles.leaderboardName, item.isUser && styles.leaderboardNameUser]}>{item.isUser ? "You" : item.name}</Text>
+                </View>
+                <View style={styles.scoreBadge}>
+                  <Text style={styles.scoreBadgeText}>{item.score}%</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </TouchableOpacity>
+
         {/* Achievements - Expanded System */}
         <Text style={styles.sectionTitle}>Hall of Fame</Text>
         <View style={styles.achievementsRow}>
@@ -233,9 +302,37 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 20, fontWeight: "900", color: THEME.colors.primary, marginTop: 8 },
   statLabel: { fontSize: 12, color: THEME.colors.textLight, marginTop: 4, fontWeight: "600" },
 
+  growthCardProfile: { backgroundColor: "#1F2937", padding: 24, borderRadius: 28, marginBottom: 24, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 20, elevation: 5 },
+  growthHeaderProfile: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
+  growthLabel: { fontSize: 14, color: "#9CA3AF", fontWeight: "700", textTransform: "uppercase" },
+  growthValue: { fontSize: 36, fontWeight: "900", color: "#FFF", marginTop: 4 },
+  rankBadgeProfile: { backgroundColor: THEME.colors.secondary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, flexDirection: 'row', alignItems: 'center' },
+  rankBadgeTextProfile: { color: "#FFF", fontSize: 12, fontWeight: "900" },
+  growthBarBgProfile: { height: 10, backgroundColor: "#374151", borderRadius: 5, overflow: "hidden", marginBottom: 24 },
+  growthBarFillProfile: { height: "100%", backgroundColor: THEME.colors.secondary },
+  growthBreakdownProfile: { flexDirection: "row", justifyContent: "space-between" },
+  breakdownItemProfile: { alignItems: "center", flex: 1 },
+  breakdownIconBox: { width: 32, height: 32, borderRadius: 10, backgroundColor: THEME.colors.primary, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
+  breakdownValProfile: { fontSize: 16, fontWeight: "800", color: "#FFF" },
+  breakdownLabProfile: { fontSize: 10, color: "#9CA3AF", marginTop: 4, fontWeight: "700", textTransform: 'uppercase' },
+
   card: { backgroundColor: "#FFF", padding: 24, borderRadius: 28, marginBottom: 24, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 20, elevation: 5 },
   cardHeader: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
-  cardTitle: { fontSize: 18, fontWeight: "700", color: THEME.colors.text, marginLeft: 8 },
+  cardTitle: { fontSize: 18, fontWeight: "700", color: THEME.colors.text, marginLeft: 8, flex: 1 },
+  viewAllBadge: { backgroundColor: THEME.colors.primary + '15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  viewAllText: { fontSize: 10, fontWeight: "800", color: THEME.colors.primary },
+
+  leaderboardList: { marginTop: 8 },
+  leaderboardItem: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#F3F4F6" },
+  leaderboardItemUser: { backgroundColor: THEME.colors.primary + '10', borderRadius: 16, paddingHorizontal: 12, borderBottomWidth: 0, marginVertical: 4 },
+  leaderboardLeft: { flexDirection: "row", alignItems: "center", flex: 1 },
+  rankText: { fontSize: 14, fontWeight: "800", color: THEME.colors.textLight, width: 30 },
+  topRank: { color: THEME.colors.primary },
+  avatarCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#F3F4F6", justifyContent: "center", alignItems: "center", marginRight: 12 },
+  leaderboardName: { fontSize: 15, fontWeight: "600", color: THEME.colors.text },
+  leaderboardNameUser: { fontWeight: "800", color: THEME.colors.primary },
+  scoreBadge: { backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+  scoreBadgeText: { fontSize: 13, fontWeight: "800", color: THEME.colors.text },
 
   avgBalanceContainer: { alignItems: "center", marginBottom: 20 },
   avgBalanceVal: { fontSize: 40, fontWeight: "900", color: THEME.colors.primary },
