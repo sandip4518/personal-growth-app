@@ -33,15 +33,28 @@ interface Transaction {
     date: string;
 }
 
+interface Goal {
+    id: string;
+    title: string;
+    description: string;
+    type: "habit" | "task" | "finance" | "custom";
+    targetValue: number;
+    currentValue: number;
+    deadline: string;
+    createdAt: string;
+    completed: boolean;
+}
+
 interface NotificationItem {
     id: string;
     title: string;
     message: string;
     time: string;
-    type: "system" | "achievement" | "finance" | "task";
+    type: "system" | "achievement" | "finance" | "task" | "goal";
     read: boolean;
 }
 
+const GOALS_STORAGE = "GOALS_STORAGE";
 const TASK_STORAGE_KEY = "tasks_storage";
 const HABITS_STORAGE_KEY = "HABITS_STORAGE";
 const FINANCE_STORAGE_KEY = "FINANCE_STORAGE";
@@ -55,15 +68,17 @@ export default function NotificationsScreen() {
 
     const generateNotifications = async () => {
         try {
-            const [storedTasks, storedHabits, storedFinance] = await Promise.all([
+            const [storedTasks, storedHabits, storedFinance, storedGoals] = await Promise.all([
                 AsyncStorage.getItem(TASK_STORAGE_KEY),
                 AsyncStorage.getItem(HABITS_STORAGE_KEY),
                 AsyncStorage.getItem(FINANCE_STORAGE_KEY),
+                AsyncStorage.getItem(GOALS_STORAGE),
             ]);
 
             const tasks: Task[] = storedTasks ? JSON.parse(storedTasks) : [];
             const habits: Habit[] = storedHabits ? JSON.parse(storedHabits) : [];
             const transactions: Transaction[] = storedFinance ? JSON.parse(storedFinance) : [];
+            const goals: Goal[] = storedGoals ? JSON.parse(storedGoals) : [];
 
             const newNotifications: NotificationItem[] = [];
 
@@ -134,7 +149,35 @@ export default function NotificationsScreen() {
                 });
             }
 
-            // 4. Welcome System Notification (always at the bottom/oldest)
+            // 4. Goal Notifications
+            const activeGoals = goals.filter(g => !g.completed);
+            const completedGoals = goals.filter(g => g.completed);
+
+            if (activeGoals.length > 0) {
+                newNotifications.push({
+                    id: "goals-active",
+                    title: "Active Goals",
+                    message: `You are currently tracking ${activeGoals.length} long-term goal(s). Remember to log your progress!`,
+                    time: "Recent",
+                    type: "goal",
+                    read: true,
+                });
+            }
+
+            if (completedGoals.length > 0) {
+                // Push the most recently created completed goal as an achievement
+                const latestCompleted = completedGoals[0]; // Assuming list is newest to oldest
+                newNotifications.push({
+                    id: "goals-completed",
+                    title: "Goal Reached! 🏆",
+                    message: `You successfully completed your goal: "${latestCompleted.title}". Fantastic job!`,
+                    time: "Recent",
+                    type: "achievement",
+                    read: false,
+                });
+            }
+
+            // 5. Welcome System Notification (always at the bottom/oldest)
             newNotifications.push({
                 id: "system-welcome",
                 title: "Welcome to Personal Growth!",
@@ -172,6 +215,9 @@ export default function NotificationsScreen() {
         } else if (item.type === "task") {
             iconName = "checkbox-outline";
             iconColor = "#E91E63";
+        } else if (item.type === "goal") {
+            iconName = "flag-outline";
+            iconColor = "#6C63FF";
         }
 
         return (

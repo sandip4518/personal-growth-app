@@ -18,7 +18,19 @@ const screenWidth = Dimensions.get('window').width;
 const HABITS_STORAGE_KEY = 'HABITS_STORAGE';
 const TASK_STORAGE_KEY = 'tasks_storage';
 const FINANCE_STORAGE_KEY = 'FINANCE_STORAGE';
+const GOALS_STORAGE = 'GOALS_STORAGE';
 const TARGET_SAVINGS = 100000;
+
+interface Goal {
+  id: string;
+  title: string;
+  type: "habit" | "task" | "finance" | "custom";
+  targetValue: number;
+  currentValue: number;
+  deadline: string;
+  completed: boolean;
+  subgoals?: any[];
+}
 
 const QUOTES = [
   "You are becoming better every day.",
@@ -41,6 +53,9 @@ export default function ProfileScreen() {
   const [highestStreak, setHighestStreak] = useState(0);
   const [savings, setSavings] = useState(0);
   const [weeklyData, setWeeklyData] = useState(Array(7).fill(0));
+  const [completedGoals, setCompletedGoals] = useState(0);
+  const [activeGoalsCount, setActiveGoalsCount] = useState(0);
+  const [activeGoalsList, setActiveGoalsList] = useState<Goal[]>([]);
 
   const [quote] = useState(QUOTES[Math.floor(Math.random() * QUOTES.length)]);
 
@@ -128,6 +143,21 @@ export default function ProfileScreen() {
           else totalExpense += t.amount;
         });
         setSavings(Math.max(0, totalIncome - totalExpense));
+      }
+
+      // Load Goals
+      const storedGoals = await AsyncStorage.getItem(GOALS_STORAGE);
+      if (storedGoals) {
+        const goals = JSON.parse(storedGoals);
+        setCompletedGoals(goals.filter((g: any) => g.completed).length);
+        const active = goals.filter((g: any) => {
+          if (g.type === "custom" && g.subgoals && g.subgoals.length > 0) {
+            return g.currentValue < g.targetValue;
+          }
+          return !g.completed && g.currentValue < g.targetValue;
+        });
+        setActiveGoalsCount(active.length);
+        setActiveGoalsList(active.slice(0, 3)); // Show top 3 active goals
       }
 
     } catch (error) {
@@ -249,6 +279,62 @@ export default function ProfileScreen() {
               </View>
               <Text style={styles.statLabel}>Current best streak</Text>
             </View>
+          </View>
+
+          {/* Stats Overview */}
+          <View style={styles.row}>
+            <View style={[styles.card, styles.flex1]}>
+              <View style={styles.cardHeaderRow}>
+                <Ionicons name="stats-chart" size={20} color="#6C63FF" />
+                <Text style={styles.cardTitle}>Stats Overview</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 10 }}>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={styles.metricBig}>{completedTasks}</Text>
+                  <Text style={styles.statLabel}>Tasks Done</Text>
+                </View>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={[styles.metricBig, { color: '#FF8C00' }]}>{totalHabits}</Text>
+                  <Text style={styles.statLabel}>Habits</Text>
+                </View>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={[styles.metricBig, { color: '#2ECC71' }]}>{completedGoals}</Text>
+                  <Text style={styles.statLabel}>Goals</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Active Goals Section */}
+          <View style={styles.card}>
+            <View style={styles.cardHeaderRow}>
+              <Ionicons name="flag" size={20} color="#6C63FF" />
+              <Text style={styles.cardTitle}>Active Goals</Text>
+            </View>
+            {activeGoalsCount > 0 ? (
+              activeGoalsList.map((goal, i) => {
+                const rawProgress = (goal.currentValue / Math.max(goal.targetValue, 1)) * 100;
+                const progress = Math.min(100, Math.max(0, rawProgress));
+                const filledBlocks = Math.round(progress / 10);
+                const emptyBlocks = 10 - filledBlocks;
+                const barText = "█".repeat(filledBlocks) + "░".repeat(emptyBlocks);
+
+                return (
+                  <View key={goal.id} style={[{ marginTop: i === 0 ? 8 : 16 }]}>
+                    <Text style={{ fontSize: 16, fontWeight: "600", color: "#1A1A1A", marginBottom: 6 }}>
+                      {goal.title}
+                    </Text>
+                    <Text style={{ fontFamily: "monospace", fontSize: 13, color: "#6C63FF", letterSpacing: 1.5 }}>
+                      {barText} {progress.toFixed(0)}%
+                    </Text>
+                  </View>
+                );
+              })
+            ) : (
+              <Text style={[styles.statLabel, { marginTop: 12, fontStyle: 'italic' }]}>
+                No active goals presently. Set one up!
+              </Text>
+            )}
           </View>
 
           {/* Savings Goal */}

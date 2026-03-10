@@ -34,6 +34,18 @@ interface Transaction {
   date: string;
 }
 
+interface Goal {
+  id: string;
+  title: string;
+  type: "habit" | "task" | "finance" | "custom";
+  targetValue: number;
+  currentValue: number;
+  deadline: string;
+  completed: boolean;
+  subgoals?: any[];
+}
+
+const GOALS_STORAGE = "GOALS_STORAGE";
 const TASK_STORAGE_KEY = "tasks_storage";
 const HABITS_STORAGE_KEY = "HABITS_STORAGE";
 const FINANCE_STORAGE_KEY = "FINANCE_STORAGE";
@@ -83,23 +95,26 @@ export default function HomeScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
 
   const [quote, setQuote] = useState(QUOTES[0]);
   const [isQuoteLoading, setIsQuoteLoading] = useState(false);
 
   const loadData = async () => {
     try {
-      const [storedTasks, storedHabits, storedFinance, storedUser] =
+      const [storedTasks, storedHabits, storedFinance, storedUser, storedGoals] =
         await Promise.all([
           AsyncStorage.getItem(TASK_STORAGE_KEY),
           AsyncStorage.getItem(HABITS_STORAGE_KEY),
           AsyncStorage.getItem(FINANCE_STORAGE_KEY),
           AsyncStorage.getItem("USER_DATA"),
+          AsyncStorage.getItem(GOALS_STORAGE),
         ]);
 
       if (storedTasks) setTasks(JSON.parse(storedTasks));
       if (storedHabits) setHabits(JSON.parse(storedHabits));
       if (storedFinance) setTransactions(JSON.parse(storedFinance));
+      if (storedGoals) setGoals(JSON.parse(storedGoals));
       if (storedUser) {
         const user = JSON.parse(storedUser);
         if (user.name) setUserName(user.name);
@@ -221,7 +236,16 @@ export default function HomeScreen() {
   const maxStreak =
     habits.length > 0 ? Math.max(...habits.map((h) => h.streak)) : 0;
 
-  // 6. REMINDERS
+  // 6. ACTIVE GOALS (needed for reminders & active sections)
+  // Ensure we fix corrupted state where completed=true but currentValue < targetValue
+  const activeGoals = goals.filter((g) => {
+    if (g.type === "custom" && g.subgoals && g.subgoals.length > 0) {
+      return g.currentValue < g.targetValue;
+    }
+    return !g.completed && g.currentValue < g.targetValue;
+  }).slice(0, 2);
+
+  // 7. REMINDERS
   const uncompletedTasks = tasks.filter((t) => !t.completed);
   const uncompletedHabits = habits.filter(
     (h) => !h.completedDates?.includes(todayStr)
@@ -236,11 +260,17 @@ export default function HomeScreen() {
     })),
     ...uncompletedTasks.map((t) => ({
       id: `t-${t.id}`,
-      icon: "checkmark-circle-outline",
+      icon: "checkbox-outline",
       text: t.title,
       type: "Task",
     })),
-  ].slice(0, 3);
+    ...activeGoals.map((g) => ({
+      id: `g-${g.id}`,
+      icon: "flag-outline",
+      text: `Goal Deadline: ${g.deadline}`,
+      type: "Goal",
+    })),
+  ].slice(0, 4); // Only show top 4 reminders
 
   return (
     <View style={[styles.safeArea, { paddingTop: insets.top }]}>
@@ -409,6 +439,33 @@ export default function HomeScreen() {
           )}
         </View>
 
+        {/* Active Goals */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Active Goals</Text>
+          {activeGoals.length > 0 ? (
+            activeGoals.map((goal, i) => {
+              const rawProgress = (goal.currentValue / Math.max(goal.targetValue, 1)) * 100;
+              const progress = Math.min(100, Math.max(0, rawProgress));
+              const filledBlocks = Math.round(progress / 10);
+              const emptyBlocks = 10 - filledBlocks;
+              const barText = "█".repeat(filledBlocks) + "░".repeat(emptyBlocks);
+
+              return (
+                <View key={goal.id} style={[{ marginBottom: i === activeGoals.length - 1 ? 0 : 16, marginTop: i === 0 ? 8 : 0 }]}>
+                  <Text style={styles.goalTitleList}>{goal.title}</Text>
+                  <Text style={styles.barTextMode}>
+                    {barText} {progress.toFixed(0)}%
+                  </Text>
+                </View>
+              );
+            })
+          ) : (
+            <Text style={styles.emptyInlineText}>
+              No active goals right now. Set a new target!
+            </Text>
+          )}
+        </View>
+
         {/* Streak & Chart Row */}
         <View style={styles.flexRow}>
           <View style={[styles.card, { flex: 1, marginRight: 8 }]}>
@@ -483,25 +540,31 @@ export default function HomeScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Upcoming Reminders</Text>
           {reminders.length > 0 ? (
-            reminders.map((r, i) => (
-              <View
-                key={r.id}
-                style={[
-                  styles.reminderRow,
-                  i === reminders.length - 1 && { borderBottomWidth: 0 },
-                ]}
-              >
-                <View style={styles.reminderIconBg}>
-                  <Ionicons name={r.icon as any} size={22} color="#6C63FF" />
+            reminders.map((r, i) => {
+              let iconColor = "#6C63FF";
+              if (r.type === "Habit") iconColor = "#FF8C00";
+              if (r.type === "Goal") iconColor = "#2ECC71";
+
+              return (
+                <View
+                  key={r.id}
+                  style={[
+                    styles.reminderRow,
+                    i === reminders.length - 1 && { borderBottomWidth: 0 },
+                  ]}
+                >
+                  <View style={styles.reminderIconBg}>
+                    <Ionicons name={r.icon as any} size={22} color={iconColor} />
+                  </View>
+                  <View style={styles.reminderTextCont}>
+                    <Text style={styles.reminderTitle} numberOfLines={1}>
+                      {r.text}
+                    </Text>
+                    <Text style={styles.reminderSub}>{r.type} {r.type === "Goal" ? "" : "- Today"}</Text>
+                  </View>
                 </View>
-                <View style={styles.reminderTextCont}>
-                  <Text style={styles.reminderTitle} numberOfLines={1}>
-                    {r.text}
-                  </Text>
-                  <Text style={styles.reminderSub}>{r.type} - Today</Text>
-                </View>
-              </View>
-            ))
+              );
+            })
           ) : (
             <View style={styles.emptyState}>
               <Ionicons name="calendar-outline" size={36} color="#D1D5DB" />
@@ -846,5 +909,17 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     textAlign: "center",
     marginTop: 8,
+  },
+  goalTitleList: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#1A1A1A",
+    marginBottom: 6,
+  },
+  barTextMode: {
+    fontFamily: "monospace",
+    fontSize: 14,
+    color: "#6C63FF",
+    letterSpacing: 2,
   },
 });
