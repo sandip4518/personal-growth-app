@@ -278,28 +278,45 @@ export default function TasksScreen() {
           </View>
         </View>
 
-        {/* Focus Mode Section */}
+        {/* Focus Mode Section — Compact */}
         <View style={styles.focusContainer}>
-          <Text style={styles.focusTitle}>Focus Mode</Text>
-          <Text style={styles.focusTimer}>{formatTime(timeLeft)}</Text>
-          <View style={styles.focusButtons}>
-            <TouchableOpacity
-              style={[styles.focusButton, isActive ? styles.focusButtonPause : styles.focusButtonStart]}
-              onPress={() => setIsActive(!isActive)}
-            >
-              <Text style={styles.focusButtonText}>{isActive ? "Pause" : "Start"}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.focusButton, styles.focusButtonReset]}
-              onPress={() => {
-                setIsActive(false);
-                setTimeLeft(FOCUS_DURATION);
-              }}
-            >
-              <Text style={[styles.focusButtonText, { color: "#1A1A1A" }]}>Reset</Text>
-            </TouchableOpacity>
+          <View style={styles.focusLeft}>
+            <View style={styles.focusTitleRow}>
+              <Ionicons name="flame" size={16} color="#FF9F43" />
+              <Text style={styles.focusTitle}>Focus Mode</Text>
+            </View>
+            <View style={styles.focusTimerRow}>
+              <View style={[styles.focusTimerRing, isActive && styles.focusTimerRingActive]}>
+                <Text style={styles.focusTimer}>{formatTime(timeLeft)}</Text>
+              </View>
+              <View style={styles.focusControls}>
+                <TouchableOpacity
+                  style={[styles.focusIconBtn, isActive ? styles.focusIconBtnPause : styles.focusIconBtnStart]}
+                  onPress={() => setIsActive(!isActive)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name={isActive ? "pause" : "play"} size={18} color="#FFF" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.focusIconBtn, styles.focusIconBtnReset]}
+                  onPress={() => {
+                    setIsActive(false);
+                    setTimeLeft(FOCUS_DURATION);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="refresh" size={18} color="#9CA3AF" />
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
-          <Text style={styles.focusSessionsText}>Focus Sessions Today: {focusSessionsToday}</Text>
+          <View style={styles.focusRight}>
+            <View style={styles.focusSessionBadge}>
+              <Ionicons name="checkmark-circle" size={14} color={THEME.colors.secondary} />
+              <Text style={styles.focusSessionCount}>{focusSessionsToday}</Text>
+            </View>
+            <Text style={styles.focusSessionLabel}>sessions</Text>
+          </View>
         </View>
 
         {/* Task List Section */}
@@ -437,36 +454,95 @@ const styles = StyleSheet.create({
   },
   focusContainer: {
     backgroundColor: "#1F2937",
-    borderRadius: 28,
-    padding: 24,
-    marginBottom: 24,
+    borderRadius: 20,
+    padding: 14,
+    paddingHorizontal: 18,
+    marginBottom: 16,
+    flexDirection: "row",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 5,
+    justifyContent: "space-between",
+    shadowColor: "#6C63FF",
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 12,
+    elevation: 6,
   },
-  focusTitle: { fontSize: 18, fontWeight: "800", color: "#FFF", marginBottom: 12 },
+  focusLeft: { flex: 1 },
+  focusTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 10,
+  },
+  focusTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#D1D5DB",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  focusTimerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  focusTimerRing: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    borderWidth: 3,
+    borderColor: "#374151",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  focusTimerRingActive: {
+    borderColor: THEME.colors.primary,
+    shadowColor: THEME.colors.primary,
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 4,
+  },
   focusTimer: {
-    fontSize: 56,
+    fontSize: 18,
     fontWeight: "900",
-    color: THEME.colors.primary,
-    marginBottom: 24,
+    color: "#FFF",
     fontVariant: ["tabular-nums"],
   },
-  focusButtons: { flexDirection: "row", gap: 16, marginBottom: 20 },
-  focusButton: {
-    paddingVertical: 14,
-    paddingHorizontal: 28,
-    borderRadius: 16,
-    minWidth: 120,
+  focusControls: { flexDirection: "row", gap: 8 },
+  focusIconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    justifyContent: "center",
     alignItems: "center",
   },
-  focusButtonStart: { backgroundColor: THEME.colors.primary },
-  focusButtonPause: { backgroundColor: "#FF9F43" },
-  focusButtonReset: { backgroundColor: "#374151" },
-  focusButtonText: { fontSize: 16, fontWeight: "800", color: "#FFF" },
-  focusSessionsText: { fontSize: 14, color: "#9CA3AF", fontWeight: "600" },
+  focusIconBtnStart: { backgroundColor: THEME.colors.primary },
+  focusIconBtnPause: { backgroundColor: "#FF9F43" },
+  focusIconBtnReset: { backgroundColor: "#374151" },
+  focusRight: {
+    alignItems: "center",
+    marginLeft: 14,
+  },
+  focusSessionBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0,201,167,0.15)",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    gap: 4,
+  },
+  focusSessionCount: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: THEME.colors.secondary,
+  },
+  focusSessionLabel: {
+    fontSize: 10,
+    color: "#6B7280",
+    fontWeight: "600",
+    marginTop: 3,
+  },
   listContainer: { paddingBottom: 40 },
   taskCard: {
     flexDirection: "row",
