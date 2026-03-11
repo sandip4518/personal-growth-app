@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Notifications from "expo-notifications";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { Goal, Habit, JournalEntry, Quest, STORAGE_KEYS, Task, Transaction, UserRewardData } from "../constants/types";
@@ -261,7 +262,7 @@ export function useGrowthData() {
                 const journalToday = journalEntries.some(e => e.date === new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' }));
                 return journalToday;
             case "finance":
-                return transactions.length >= quest.targetCount;
+                return transactions.filter(t => t.date?.startsWith(todayStr)).length >= quest.targetCount;
             default:
                 return false;
         }
@@ -313,6 +314,13 @@ export function useGrowthData() {
             // Final strict check
             const isActuallyFinished = checkQuestStatus(quest, data.tasks, data.habits, data.transactions, data.journalEntries, data.rewardData);
             if (!isActuallyFinished) {
+                await Notifications.scheduleNotificationAsync({
+                    content: {
+                        title: "Quest Not Complete ❌",
+                        body: "Complete the quest requirements before claiming your reward!",
+                    },
+                    trigger: null,
+                });
                 setIsClaiming(false);
                 return;
             }
