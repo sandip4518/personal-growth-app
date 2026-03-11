@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
-import { Goal, Habit, JournalEntry, Quest, STORAGE_KEYS, Task, Transaction, UserRewardData } from "../constants/types";
+import { Goal, GrowthDNA, Habit, JournalEntry, Quest, STORAGE_KEYS, Task, Transaction, UserRewardData } from "../constants/types";
 
 export interface GrowthMetrics {
     personalGrowthScore: number;
@@ -28,6 +28,7 @@ export interface GrowthMetrics {
     weeklySavings: number;
     weeklyExpenses: number;
     weeklyProductivityScore: number;
+    growthDNA: GrowthDNA;
 }
 
 const getLevelInfo = (xp: number) => {
@@ -85,9 +86,10 @@ export function useGrowthData() {
                 AsyncStorage.getItem(STORAGE_KEYS.JOURNAL),
                 AsyncStorage.getItem(STORAGE_KEYS.QUESTS),
                 AsyncStorage.getItem(STORAGE_KEYS.REWARDS),
+                AsyncStorage.getItem("LIFE_BALANCE_STORAGE"),
             ]);
 
-            const [sTasks, sHabits, sFinance, sUser, sGoals, sJournal, sQuests, sRewards] = results;
+            const [sTasks, sHabits, sFinance, sUser, sGoals, sJournal, sQuests, sRewards, sLifeBalance] = results;
 
             const tasks: Task[] = sTasks ? JSON.parse(sTasks) : [];
             const habits: Habit[] = sHabits ? JSON.parse(sHabits) : [];
@@ -100,6 +102,7 @@ export function useGrowthData() {
                 unlockedTitles: ["Growth Seeker"],
                 completedQuestIds: []
             };
+            const lifeBalance: Record<string, number> = sLifeBalance ? JSON.parse(sLifeBalance) : {};
 
             const todayStr = new Date().toISOString().split("T")[0];
             let activeQuest = quests.find(q => q.date === todayStr);
@@ -116,7 +119,7 @@ export function useGrowthData() {
                 if (user.name) userName = user.name;
             }
 
-            calculateMetrics(tasks, habits, goals, transactions, journalEntries, activeQuest, rewardData);
+            calculateMetrics(tasks, habits, goals, transactions, journalEntries, activeQuest, rewardData, lifeBalance);
             setData({ tasks, habits, transactions, goals, journalEntries, userName, quests, rewardData });
         } catch (e) {
             console.error("Failed to load growth data", e);
@@ -132,7 +135,8 @@ export function useGrowthData() {
         transactions: Transaction[],
         journalEntries: JournalEntry[],
         activeQuest: Quest | null,
-        rewardData: UserRewardData
+        rewardData: UserRewardData,
+        lifeBalance: Record<string, number>
     ) => {
         const todayStr = new Date().toISOString().split("T")[0];
 
@@ -164,7 +168,6 @@ export function useGrowthData() {
         const personalGrowthScore = Math.round(taskContrib + habitContrib + goalContrib + financeContrib + journalContrib);
 
         // 3. XP & Leveling
-        // XP Calculation: Total Lifetime Completion
         const lifetimeTasks = tasks.filter(t => t.completed).length * 10;
         const lifetimeHabitCompletions = habits.reduce((sum, h) => sum + (h.completedDates?.length || 0), 0) * 5;
         const lifetimeGoals = goals.filter(g => g.completed).length * 50;
@@ -173,6 +176,9 @@ export function useGrowthData() {
 
         const totalXP = lifetimeTasks + lifetimeHabitCompletions + lifetimeGoals + lifetimeJournal + questXP;
         const levelInfo = getLevelInfo(totalXP);
+
+        // 4. Growth DNA
+        const growthDNA = calculateGrowthDNA(tasks, habits, goals, transactions, journalEntries, lifeBalance, todayStr);
 
         setMetrics({
             personalGrowthScore,
@@ -197,6 +203,7 @@ export function useGrowthData() {
                 isClaimed: rewardData.completedQuestIds.includes(activeQuest.id)
             } : null,
             userTitle: rewardData.currentTitle,
+            growthDNA,
             ...calculateWeeklyMetrics(tasks, habits, transactions)
         });
     };
@@ -283,6 +290,158 @@ export function useGrowthData() {
         const expenses = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
         const savings = income - expenses;
         return income > 0 ? Math.min(1, savings / income) : 0;
+    };
+
+    // ─── Growth DNA Engine ────────────────────────────────────────────
+    const calculateGrowthDNA = (
+        tasks: Task[],
+        habits: Habit[],
+        goals: Goal[],
+        transactions: Transaction[],
+        journalEntries: JournalEntry[],
+        lifeBalance: Record<string, number>,
+        todayStr: string
+    ): GrowthDNA => {
+        const now = new Date();
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay());
+        startOfWeek.setHours(0, 0, 0, 0);
+
+        // ── Discipline (task completion rate + daily focus) ──
+        const completedTasks = tasks.filter(t => t.completed).length;
+        const taskRate = tasks.length > 0 ? completedTasks / tasks.length : 0;
+        const todayTasks = tasks.filter(t => t.completed && t.completedAt?.startsWith(todayStr)).length;
+        const dailyBonus = Math.min(1, todayTasks / 3); // up to 3 tasks today = bonus
+        const discipline = Math.round(Math.min(100, (taskRate * 70 + dailyBonus * 30)));
+
+        // ── Mindfulness (journal activity + mood variety) ──
+        const weekJournals = journalEntries.filter(e => {
+            try { return new Date(e.date) >= startOfWeek; } catch { return false; }
+        }).length;
+        const uniqueMoods = new Set(journalEntries.map(e => e.mood)).size;
+        const journalScore = Math.min(1, weekJournals / 5); // 5 entries/week = max
+        const moodScore = Math.min(1, uniqueMoods / 4); // 4 different moods = max awareness
+        const mindfulness = Math.round(Math.min(100, (journalScore * 60 + moodScore * 40)));
+
+        // ── Financial Health (savings ratio + income vs expense trend) ──
+        const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+        const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+        const savingsRatio = totalIncome > 0 ? Math.max(0, (totalIncome - totalExpenses) / totalIncome) : 0;
+        const hasTransactions = transactions.length > 0;
+        const financialHealth = Math.round(Math.min(100, hasTransactions ? savingsRatio * 100 : 0));
+
+        // ── Consistency (habit streaks + completion spread) ──
+        const avgStreak = habits.length > 0 ? habits.reduce((s, h) => s + h.streak, 0) / habits.length : 0;
+        const totalCompletions = habits.reduce((s, h) => s + (h.completedDates?.length || 0), 0);
+        const completionDensity = habits.length > 0 ? Math.min(1, totalCompletions / (habits.length * 7)) : 0;
+        const consistency = Math.round(Math.min(100, (Math.min(1, avgStreak / 7) * 50 + completionDensity * 50)));
+
+        // ── Ambition (goals created + progress + high priority tasks) ──
+        const goalsCreated = Math.min(1, goals.length / 5);
+        const avgGoalProgress = goals.length > 0
+            ? goals.reduce((s, g) => s + Math.min(1, g.currentValue / Math.max(g.targetValue, 1)), 0) / goals.length
+            : 0;
+        const highPriorityRate = tasks.length > 0
+            ? tasks.filter(t => t.priority === 'high' && t.completed).length / Math.max(1, tasks.filter(t => t.priority === 'high').length)
+            : 0;
+        const ambition = Math.round(Math.min(100, (goalsCreated * 30 + avgGoalProgress * 40 + highPriorityRate * 30)));
+
+        // ── Self-Awareness (life balance engagement + reflections) ──
+        const balanceValues = Object.values(lifeBalance);
+        const balanceEngagement = balanceValues.length > 0 ? 1 : 0; // Have they used the feature?
+        const balanceVariety = balanceValues.length > 0
+            ? 1 - (Math.max(...balanceValues) - Math.min(...balanceValues)) / 10 // closer values = more balanced
+            : 0;
+        const reflectionDepth = Math.min(1, journalEntries.length / 10);
+        const selfAwareness = Math.round(Math.min(100, (balanceEngagement * 20 + balanceVariety * 30 + reflectionDepth * 50)));
+
+        const dims = { discipline, mindfulness, financialHealth, consistency, ambition, selfAwareness };
+
+        // ── Archetype (top 2 dimensions determine type) ──
+        const sorted = Object.entries(dims).sort((a, b) => b[1] - a[1]);
+        const top2 = new Set([sorted[0][0], sorted[1][0]]);
+        const archetype = getArchetype(top2);
+
+        // ── Cross-module insights ──
+        const insights = generateInsights(tasks, habits, journalEntries, transactions, todayStr, dims);
+
+        return { dimensions: dims, archetype, insights };
+    };
+
+    const getArchetype = (top2: Set<string>): { name: string; emoji: string; description: string } => {
+        if (top2.has('discipline') && top2.has('ambition'))
+            return { name: 'The Strategist', emoji: '🧠', description: 'You combine fierce discipline with bold ambitions. You plan, execute, and conquer.' };
+        if (top2.has('mindfulness') && top2.has('consistency'))
+            return { name: 'The Monk', emoji: '🧘', description: 'Steady and self-aware, you build lasting habits through reflection and patience.' };
+        if (top2.has('consistency') && top2.has('discipline'))
+            return { name: 'The Machine', emoji: '⚙️', description: 'Relentless and reliable. Your consistency and discipline make you unstoppable.' };
+        if (top2.has('financialHealth') && top2.has('ambition'))
+            return { name: 'The Mogul', emoji: '💎', description: 'You chase big goals while keeping finances sharp. A natural empire-builder.' };
+        if (top2.has('mindfulness') && top2.has('selfAwareness'))
+            return { name: 'The Sage', emoji: '🔮', description: 'Deep self-knowledge and reflection guide your growth journey.' };
+        if (top2.has('ambition') && top2.has('consistency'))
+            return { name: 'The Climber', emoji: '🏔️', description: 'You set ambitious goals and chip away at them day after day. Unstoppable momentum.' };
+        if (top2.has('discipline') && top2.has('financialHealth'))
+            return { name: 'The Architect', emoji: '🏗️', description: 'You build solid foundations — structured habits, sound finances, and clear plans.' };
+        if (top2.has('selfAwareness') && top2.has('consistency'))
+            return { name: 'The Philosopher', emoji: '📖', description: 'You reflect deeply and move steadily. Your growth is intentional and measured.' };
+        // Default / all-rounder
+        return { name: 'The Explorer', emoji: '🌱', description: 'You\'re growing across all dimensions. Keep exploring and your unique path will reveal itself.' };
+    };
+
+    const generateInsights = (
+        tasks: Task[],
+        habits: Habit[],
+        journalEntries: JournalEntry[],
+        transactions: Transaction[],
+        todayStr: string,
+        dims: Record<string, number>
+    ): string[] => {
+        const insights: string[] = [];
+
+        // Insight: Journal & task correlation
+        const journalDates = new Set(journalEntries.map(e => e.date));
+        const taskDatesCompleted = tasks.filter(t => t.completed && t.completedAt).map(t => t.completedAt!.split('T')[0]);
+        const tasksOnJournalDays = taskDatesCompleted.filter(d => journalDates.has(d)).length;
+        const tasksOnOtherDays = taskDatesCompleted.length - tasksOnJournalDays;
+        if (journalDates.size > 0 && tasksOnJournalDays > tasksOnOtherDays) {
+            insights.push('You complete more tasks on days you write a journal entry. Reflection fuels productivity!');
+        }
+
+        // Insight: Spending vs habits
+        if (dims.consistency > 60 && dims.financialHealth > 50) {
+            insights.push('Strong habits correlate with better finances for you. Discipline in one area spills over!');
+        } else if (dims.consistency < 30 && dims.financialHealth < 40) {
+            insights.push('Building consistent habits could help improve your financial health too. Start small!');
+        }
+
+        // Insight: Strongest dimension
+        const sorted = Object.entries(dims).sort((a, b) => b[1] - a[1]);
+        const dimLabels: Record<string, string> = {
+            discipline: 'Discipline', mindfulness: 'Mindfulness', financialHealth: 'Financial Health',
+            consistency: 'Consistency', ambition: 'Ambition', selfAwareness: 'Self-Awareness'
+        };
+        if (sorted[0][1] > 0) {
+            insights.push(`Your superpower is ${dimLabels[sorted[0][0]]} — it's your highest Growth DNA dimension.`);
+        }
+
+        // Insight: Weakest dimension
+        if (sorted[sorted.length - 1][1] < sorted[0][1] && sorted[0][1] > 0) {
+            insights.push(`${dimLabels[sorted[sorted.length - 1][0]]} has the most room to grow. Small steps there can boost your overall DNA.`);
+        }
+
+        // Insight: Habit streaks
+        const maxStreak = Math.max(...habits.map(h => h.streak), 0);
+        if (maxStreak >= 7) {
+            insights.push(`Amazing! You have a ${maxStreak}-day habit streak going. This consistency is rare.`);
+        }
+
+        // Fallback
+        if (insights.length === 0) {
+            insights.push('Start completing tasks, building habits, and journaling to unlock personalized insights!');
+        }
+
+        return insights.slice(0, 4); // Max 4 insights
     };
 
     const generateDailyQuest = (date: string): Quest => {

@@ -149,6 +149,74 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Growth DNA Detail Section */}
+        {metrics?.growthDNA && (
+          <View style={styles.dnaDetailCard}>
+            {/* Header with fingerprint badge */}
+            <View style={styles.dnaDetailHeader}>
+              <View style={styles.dnaHeaderBadge}>
+                <Ionicons name="finger-print" size={16} color="#FFF" />
+              </View>
+              <Text style={styles.dnaDetailTitle}>Growth DNA</Text>
+              <View style={styles.dnaSubBadge}>
+                <Text style={styles.dnaSubBadgeText}>UNIQUE TO YOU</Text>
+              </View>
+            </View>
+
+            {/* Premium Archetype Display */}
+            <View style={styles.archetypeDisplayCard}>
+              <View style={styles.archetypeGlow}>
+                <Text style={styles.archetypeDisplayEmoji}>{metrics.growthDNA.archetype.emoji}</Text>
+              </View>
+              <Text style={styles.archetypeDisplayName}>{metrics.growthDNA.archetype.name}</Text>
+              <View style={styles.archetypeDivider} />
+              <Text style={styles.archetypeDisplayDesc}>{metrics.growthDNA.archetype.description}</Text>
+            </View>
+
+            {/* 6 Dimension Bars */}
+            {([
+              { key: 'discipline', label: 'Discipline', color: '#818CF8', icon: 'shield-checkmark' },
+              { key: 'mindfulness', label: 'Mindfulness', color: '#F472B6', icon: 'leaf' },
+              { key: 'financialHealth', label: 'Financial Health', color: '#34D399', icon: 'wallet' },
+              { key: 'consistency', label: 'Consistency', color: '#FBBF24', icon: 'flame' },
+              { key: 'ambition', label: 'Ambition', color: '#F87171', icon: 'rocket' },
+              { key: 'selfAwareness', label: 'Self-Awareness', color: '#A78BFA', icon: 'eye' },
+            ] as const).map(dim => (
+              <View key={dim.key} style={styles.dnaDimRow}>
+                <View style={styles.dnaDimLabelRow}>
+                  <View style={[styles.dnaDimIconBox, { backgroundColor: dim.color + '18' }]}>
+                    <Ionicons name={dim.icon as any} size={16} color={dim.color} />
+                  </View>
+                  <Text style={styles.dnaDimLabel}>{dim.label}</Text>
+                  <Text style={[styles.dnaDimValue, { color: dim.color }]}>{metrics.growthDNA.dimensions[dim.key]}%</Text>
+                </View>
+                <View style={styles.dnaDimBarBg}>
+                  <View style={[styles.dnaDimBarFill, { width: `${metrics.growthDNA.dimensions[dim.key]}%`, backgroundColor: dim.color }]} />
+                </View>
+              </View>
+            ))}
+
+            {/* Cross-Module Insights */}
+            <View style={styles.insightsHeader}>
+              <Ionicons name="bulb-outline" size={16} color={THEME.colors.secondary} />
+              <Text style={styles.insightsTitle}>Aha! Insights</Text>
+            </View>
+            {metrics.growthDNA.insights.map((insight, idx) => {
+              const bgColors = ['#EEF2FF', '#FDF2F8', '#ECFDF5', '#FEF3C7'];
+              const textColors = ['#3730A3', '#9D174D', '#065F46', '#92400E'];
+              const emojis = ['💡', '🔗', '⚡', '🎯'];
+              return (
+                <View key={idx} style={[styles.insightCard, { backgroundColor: bgColors[idx % 4] }]}>
+                  <View style={styles.insightEmojiCircle}>
+                    <Text style={styles.insightEmoji}>{emojis[idx % 4]}</Text>
+                  </View>
+                  <Text style={[styles.insightText, { color: textColors[idx % 4] }]}>{insight}</Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
         {/* Stats Grid - Standardized to Dashboard Style */}
         <View style={styles.statsGrid}>
           <View style={styles.statBox}>
@@ -352,4 +420,31 @@ const styles = StyleSheet.create({
   badgeEmoji: { fontSize: 32, marginBottom: 8 },
   badgeTitle: { fontSize: 14, fontWeight: "800", color: THEME.colors.text, textAlign: 'center' },
   badgeSub: { fontSize: 11, color: THEME.colors.textLight, marginTop: 4, fontWeight: "600", textAlign: 'center' },
+
+  // Growth DNA Detail — Premium
+  dnaDetailCard: { backgroundColor: "#FFF", padding: 24, borderRadius: 28, marginBottom: 24, shadowColor: "#6C63FF", shadowOpacity: 0.08, shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 6, borderWidth: 1, borderColor: '#F3F4F6' },
+  dnaDetailHeader: { flexDirection: "row", alignItems: "center", marginBottom: 20 },
+  dnaHeaderBadge: { width: 32, height: 32, borderRadius: 10, backgroundColor: THEME.colors.primary, justifyContent: 'center', alignItems: 'center' },
+  dnaDetailTitle: { fontSize: 18, fontWeight: "900", color: THEME.colors.text, marginLeft: 10, flex: 1 },
+  dnaSubBadge: { backgroundColor: THEME.colors.secondary + '15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  dnaSubBadgeText: { fontSize: 8, fontWeight: "900", color: THEME.colors.secondary, letterSpacing: 1 },
+  archetypeDisplayCard: { backgroundColor: "#0F172A", borderRadius: 24, padding: 28, alignItems: "center", marginBottom: 24, borderWidth: 1, borderColor: '#1E293B' },
+  archetypeGlow: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#1E293B', justifyContent: 'center', alignItems: 'center', marginBottom: 14, borderWidth: 2, borderColor: '#334155' },
+  archetypeDisplayEmoji: { fontSize: 36 },
+  archetypeDisplayName: { fontSize: 24, fontWeight: "900", color: "#F1F5F9", marginBottom: 12, letterSpacing: 0.5 },
+  archetypeDivider: { width: 40, height: 3, backgroundColor: THEME.colors.primary, borderRadius: 2, marginBottom: 14 },
+  archetypeDisplayDesc: { fontSize: 13, color: "#94A3B8", textAlign: "center", lineHeight: 20, fontWeight: "500", paddingHorizontal: 8 },
+  dnaDimRow: { marginBottom: 14 },
+  dnaDimLabelRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
+  dnaDimIconBox: { width: 32, height: 32, borderRadius: 10, justifyContent: "center", alignItems: "center", marginRight: 10 },
+  dnaDimLabel: { flex: 1, fontSize: 14, fontWeight: "700", color: THEME.colors.text },
+  dnaDimValue: { fontSize: 14, fontWeight: "900" },
+  dnaDimBarBg: { height: 8, backgroundColor: "#F1F5F9", borderRadius: 4, overflow: "hidden" },
+  dnaDimBarFill: { height: "100%", borderRadius: 4 },
+  insightsHeader: { flexDirection: 'row', alignItems: 'center', marginTop: 12, marginBottom: 14 },
+  insightsTitle: { fontSize: 16, fontWeight: "900", color: THEME.colors.text, marginLeft: 8 },
+  insightCard: { flexDirection: "row", padding: 16, borderRadius: 18, marginBottom: 10, alignItems: "center" },
+  insightEmojiCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', marginRight: 12, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
+  insightEmoji: { fontSize: 14 },
+  insightText: { flex: 1, fontSize: 13, lineHeight: 19, fontWeight: "600" },
 });

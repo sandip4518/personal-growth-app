@@ -58,6 +58,19 @@ export interface UserRewardData {
     completedQuestIds: string[];
 }
 
+export interface GrowthDNA {
+    dimensions: {
+        discipline: number;
+        mindfulness: number;
+        financialHealth: number;
+        consistency: number;
+        ambition: number;
+        selfAwareness: number;
+    };
+    archetype: { name: string; emoji: string; description: string };
+    insights: string[];
+}
+
 export const STORAGE_KEYS = {
     TASKS: "tasks_storage",
     HABITS: "HABITS_STORAGE",

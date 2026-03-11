@@ -28,10 +28,21 @@ export default function HomeScreen() {
   const { loading, data, metrics, refresh, completeQuest } = useGrowthData();
   const [quote, setQuote] = useState(QUOTES[0]);
   const [refreshing, setRefreshing] = useState(false);
+  const [insightIndex, setInsightIndex] = useState(0);
 
   useEffect(() => {
     setQuote(QUOTES[Math.floor(Math.random() * QUOTES.length)]);
   }, []);
+
+  // Rotate DNA insights every 5 seconds
+  useEffect(() => {
+    const insights = metrics?.growthDNA?.insights || [];
+    if (insights.length <= 1) return;
+    const timer = setInterval(() => {
+      setInsightIndex(prev => (prev + 1) % insights.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [metrics?.growthDNA?.insights]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -56,13 +67,12 @@ export default function HomeScreen() {
     month: "long",
   }).format(new Date());
 
-  // Smart Insight Logic
+  // Smart Insight Logic — powered by Growth DNA
   const getSmartInsight = () => {
-    if (!metrics) return "Loading insights...";
-    if (metrics.personalGrowthScore > 80) return "You're in the elite 1% of growth today! Keep the momentum.";
-    if (metrics.habitsProgress === 0 && data.habits.length > 0) return "Your habits are waiting for you. Small steps count!";
-    if (metrics.tasksProgress > 0.7) return "Productivity is high! Remember to take breaks.";
-    return "Consistency is the key to transformation. You're doing great!";
+    if (!metrics?.growthDNA) return "Loading insights...";
+    const insights = metrics.growthDNA.insights;
+    if (insights.length === 0) return "Consistency is the key to transformation. You're doing great!";
+    return insights[insightIndex % insights.length];
   };
 
   // Rank Calculation (Real Users Only)
@@ -222,6 +232,64 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* Growth DNA Card */}
+        {metrics?.growthDNA && (
+          <TouchableOpacity
+            style={styles.dnaCard}
+            activeOpacity={0.85}
+            onPress={() => router.push("/profile")}
+          >
+            {/* Accent top border */}
+            <View style={styles.dnaAccentBar} />
+            <View style={styles.dnaHeader}>
+              <View style={styles.dnaEmojiCircle}>
+                <Text style={styles.archetypeEmoji}>{metrics.growthDNA.archetype.emoji}</Text>
+              </View>
+              <View style={{ flex: 1, marginLeft: 14 }}>
+                <Text style={styles.dnaLabel}>GROWTH DNA</Text>
+                <Text style={styles.archetypeName}>{metrics.growthDNA.archetype.name}</Text>
+              </View>
+              <View style={styles.dnaTapHint}>
+                <Text style={styles.dnaTapText}>View DNA</Text>
+                <Ionicons name="arrow-forward" size={12} color={THEME.colors.primary} />
+              </View>
+            </View>
+
+            <View style={styles.dnaDivider} />
+
+            <View style={styles.dnaBarsContainer}>
+              {([
+                { key: 'discipline', label: 'Discipline', color: '#818CF8', icon: 'shield-checkmark' },
+                { key: 'mindfulness', label: 'Mindfulness', color: '#F472B6', icon: 'leaf' },
+                { key: 'financialHealth', label: 'Finance', color: '#34D399', icon: 'wallet' },
+                { key: 'consistency', label: 'Consistency', color: '#FBBF24', icon: 'flame' },
+                { key: 'ambition', label: 'Ambition', color: '#F87171', icon: 'rocket' },
+                { key: 'selfAwareness', label: 'Awareness', color: '#A78BFA', icon: 'eye' },
+              ] as const).map(dim => (
+                <View key={dim.key} style={styles.dnaBarRow}>
+                  <View style={styles.dnaBarLabelRow}>
+                    <View style={[styles.dnaBarIcon, { backgroundColor: dim.color + '25' }]}>
+                      <Ionicons name={dim.icon as any} size={10} color={dim.color} />
+                    </View>
+                    <Text style={styles.dnaBarLabel}>{dim.label}</Text>
+                  </View>
+                  <View style={styles.dnaBarBg}>
+                    <View
+                      style={[
+                        styles.dnaBarFill,
+                        { width: `${metrics.growthDNA.dimensions[dim.key]}%`, backgroundColor: dim.color },
+                      ]}
+                    />
+                  </View>
+                  <Text style={[styles.dnaBarValue, { color: dim.color }]}>
+                    {metrics.growthDNA.dimensions[dim.key]}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </TouchableOpacity>
+        )}
+
         {/* Stats Grid */}
         <View style={styles.statsGrid}>
           <View style={styles.statBox}>
@@ -358,4 +426,24 @@ const styles = StyleSheet.create({
   focusSub: { color: "#9CA3AF", fontSize: 13 },
   focusBtn: { backgroundColor: THEME.colors.primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
   focusBtnText: { color: "#FFF", fontWeight: "700", fontSize: 14 },
+
+  // Growth DNA Card
+  dnaCard: { backgroundColor: "#0F172A", borderRadius: 28, padding: 0, marginBottom: 24, shadowColor: "#6C63FF", shadowOpacity: 0.2, shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 8, overflow: 'hidden' },
+  dnaAccentBar: { height: 4, backgroundColor: THEME.colors.primary },
+  dnaHeader: { flexDirection: "row", alignItems: "center", paddingHorizontal: 24, paddingTop: 20, paddingBottom: 16 },
+  dnaEmojiCircle: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#1E293B', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#334155' },
+  dnaLabel: { fontSize: 9, fontWeight: "800", color: "#64748B", letterSpacing: 2, marginBottom: 2 },
+  archetypeEmoji: { fontSize: 22 },
+  archetypeName: { fontSize: 18, fontWeight: "900", color: "#F1F5F9" },
+  dnaTapHint: { flexDirection: 'row', alignItems: 'center', backgroundColor: THEME.colors.primary + '15', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 },
+  dnaTapText: { fontSize: 10, fontWeight: "800", color: THEME.colors.primary, marginRight: 4 },
+  dnaDivider: { height: 1, backgroundColor: '#1E293B', marginHorizontal: 24 },
+  dnaBarsContainer: { paddingHorizontal: 24, paddingVertical: 16, gap: 10 },
+  dnaBarRow: { flexDirection: "row", alignItems: "center" },
+  dnaBarLabelRow: { flexDirection: "row", alignItems: "center", width: 100 },
+  dnaBarIcon: { width: 20, height: 20, borderRadius: 6, justifyContent: 'center', alignItems: 'center', marginRight: 6 },
+  dnaBarLabel: { fontSize: 11, color: "#94A3B8", fontWeight: "700" },
+  dnaBarBg: { flex: 1, height: 6, backgroundColor: "#1E293B", borderRadius: 3, overflow: "hidden", marginHorizontal: 8 },
+  dnaBarFill: { height: "100%", borderRadius: 3 },
+  dnaBarValue: { fontSize: 11, fontWeight: "900", width: 24, textAlign: "right" },
 });
