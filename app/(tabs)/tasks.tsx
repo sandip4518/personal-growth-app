@@ -98,7 +98,8 @@ export default function TasksScreen() {
       try {
         const storedTasks = await AsyncStorage.getItem(STORAGE_KEYS.TASKS);
         if (storedTasks) {
-          setTasks(JSON.parse(storedTasks));
+          const parsed = JSON.parse(storedTasks);
+          if (parsed) setTasks(parsed);
         }
       } catch (error) {
         console.error("Failed to load tasks from AsyncStorage:", error);

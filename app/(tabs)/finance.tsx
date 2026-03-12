@@ -35,7 +35,10 @@ export default function FinanceScreen() {
 
   const loadTransactions = async () => {
     const saved = await AsyncStorage.getItem(STORAGE_KEYS.FINANCE);
-    if (saved) setTransactions(JSON.parse(saved));
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed) setTransactions(parsed);
+    }
   };
 
   const handleAddTransaction = async () => {

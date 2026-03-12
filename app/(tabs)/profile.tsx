@@ -30,7 +30,14 @@ export default function ProfileScreen() {
   useEffect(() => {
     const loadLifeBalance = async () => {
       const stored = await AsyncStorage.getItem("LIFE_BALANCE_STORAGE");
-      if (stored) setLifeBalance(JSON.parse(stored));
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed) setLifeBalance(parsed);
+        } catch (e) {
+          console.error("Failed to parse life balance", e);
+        }
+      }
     };
     loadLifeBalance();
   }, []);
@@ -58,7 +65,10 @@ export default function ProfileScreen() {
     );
   }
 
-  const averageBalance = (Object.values(lifeBalance).reduce((a, b) => a + b, 0) / Object.values(lifeBalance).length).toFixed(1);
+  const balanceValues = Object.values(lifeBalance);
+  const averageBalance = balanceValues.length > 0
+    ? (balanceValues.reduce((a, b) => a + b, 0) / balanceValues.length).toFixed(1)
+    : "0.0";
 
   // Rank Calculation (Real Users Only)
   const leaderboardData = [

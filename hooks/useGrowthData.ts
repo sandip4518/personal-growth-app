@@ -91,31 +91,35 @@ export function useGrowthData() {
 
             const [sTasks, sHabits, sFinance, sUser, sGoals, sJournal, sQuests, sRewards, sLifeBalance] = results;
 
-            const tasks: Task[] = sTasks ? JSON.parse(sTasks) : [];
-            const habits: Habit[] = sHabits ? JSON.parse(sHabits) : [];
-            const transactions: Transaction[] = sFinance ? JSON.parse(sFinance) : [];
-            const goals: Goal[] = sGoals ? JSON.parse(sGoals) : [];
-            const journalEntries: JournalEntry[] = sJournal ? JSON.parse(sJournal) : [];
-            let quests: Quest[] = sQuests ? JSON.parse(sQuests) : [];
-            let rewardData: UserRewardData = sRewards ? JSON.parse(sRewards) : {
+            const tasks: Task[] = sTasks ? (JSON.parse(sTasks) || []) : [];
+            const habits: Habit[] = sHabits ? (JSON.parse(sHabits) || []) : [];
+            const transactions: Transaction[] = sFinance ? (JSON.parse(sFinance) || []) : [];
+            const goals: Goal[] = sGoals ? (JSON.parse(sGoals) || []) : [];
+            const journalEntries: JournalEntry[] = sJournal ? (JSON.parse(sJournal) || []) : [];
+            let quests: Quest[] = sQuests ? (JSON.parse(sQuests) || []) : [];
+            let rewardData: UserRewardData = sRewards ? (JSON.parse(sRewards) || {
+                currentTitle: "Growth Seeker",
+                unlockedTitles: ["Growth Seeker"],
+                completedQuestIds: []
+            }) : {
                 currentTitle: "Growth Seeker",
                 unlockedTitles: ["Growth Seeker"],
                 completedQuestIds: []
             };
-            const lifeBalance: Record<string, number> = sLifeBalance ? JSON.parse(sLifeBalance) : {};
+            const lifeBalance: Record<string, number> = sLifeBalance ? (JSON.parse(sLifeBalance) || {}) : {};
 
             const todayStr = new Date().toISOString().split("T")[0];
-            let activeQuest = quests.find(q => q.date === todayStr);
+            let activeQuest = Array.isArray(quests) ? quests.find(q => q.date === todayStr) : null;
 
             if (!activeQuest) {
                 activeQuest = generateDailyQuest(todayStr);
-                quests = [activeQuest, ...quests.slice(0, 9)]; // Keep last 10
+                quests = [activeQuest, ...(Array.isArray(quests) ? quests.slice(0, 9) : [])]; // Keep last 10
                 await AsyncStorage.setItem(STORAGE_KEYS.QUESTS, JSON.stringify(quests));
             }
 
             let userName = "Sandy";
             if (sUser) {
-                const user = JSON.parse(sUser);
+                const user = JSON.parse(sUser) || {};
                 if (user.name) userName = user.name;
             }
 

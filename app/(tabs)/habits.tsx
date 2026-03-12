@@ -52,7 +52,8 @@ export default function HabitsScreen() {
       try {
         const storedHabits = await AsyncStorage.getItem(STORAGE_KEYS.HABITS);
         if (storedHabits) {
-          setHabits(JSON.parse(storedHabits));
+          const parsed = JSON.parse(storedHabits);
+          if (parsed) setHabits(parsed);
         }
       } catch (error) {
         console.error("Failed to load habits:", error);
